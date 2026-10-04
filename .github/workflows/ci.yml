@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint & Analisis Statis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip, sodium
+          coverage: none
+          tools: composer:v2
+
+      - name: Pasang dependensi
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Format kode (Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: Analisis statis (PHPStan level 6)
+        run: ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+  security:
+    name: Pemindaian Keamanan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+
+      - name: Pasang dependensi
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # Kerentanan Critical/High menggagalkan build (NFR-SEC-09).
+      - name: Audit kerentanan dependensi
+        run: composer audit --abandoned=report
+
+      # Tidak boleh ada kredensial di dalam repositori (NFR-SEC-08).
+      - name: Deteksi secret di riwayat Git
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: Pengujian
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        # DIKUNCI KE 8.0 SECARA SENGAJA.
+        # Target produksi adalah MySQL 8.0 (KEP-002), sementara mesin
+        # pengembang mungkin memakai versi lebih baru. CI-lah yang menangkap
+        # pemakaian fitur yang tidak tersedia di 8.0 — bukan server produksi.
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sid_desa_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip, sodium
+          coverage: xdebug
+
+      - name: Pasang dependensi
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Siapkan lingkungan
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan sid:generate-pii-keys > /dev/null
+
+      - name: Jalankan migrasi (MySQL 8.0)
+        env:
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: sid_desa_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: php artisan migrate --force
+
+      # --------------------------------------------------------------------
+      # Lapis WAJIB. Tanpa Row-Level Security (MySQL, KEP-002), dua tahap
+      # berikut adalah satu-satunya verifikasi otomatis bahwa pembatasan
+      # wilayah & keluarga benar-benar bekerja. Kegagalannya MEMBLOKIR RILIS
+      # dan tidak boleh dilewati dengan alasan apa pun.
+      # --------------------------------------------------------------------
+      - name: "WAJIB — Batas lapis repository"
+        env: { DB_HOST: 127.0.0.1, DB_USERNAME: root, DB_PASSWORD: root }
+        run: ./vendor/bin/phpunit --testsuite Architecture
+
+      - name: "WAJIB — Matriks otorisasi (wilayah & keluarga)"
+        env: { DB_HOST: 127.0.0.1, DB_USERNAME: root, DB_PASSWORD: root }
+        run: ./vendor/bin/phpunit --testsuite Authorization
+
+      - name: Uji unit & fitur
+        env: { DB_HOST: 127.0.0.1, DB_USERNAME: root, DB_PASSWORD: root }
+        run: ./vendor/bin/phpunit --testsuite Unit,Feature
+
+      - name: Cakupan uji (ambang NFR-MNT-01)
+        env: { DB_HOST: 127.0.0.1, DB_USERNAME: root, DB_PASSWORD: root }
+        run: |
+          ./vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml
+          php -r '
+            $xml = simplexml_load_file("coverage.xml");
+            $m = $xml->project->metrics;
+            $pct = $m["statements"] > 0 ? round($m["coveredstatements"] / $m["statements"] * 100, 1) : 0;
+            echo "Cakupan: {$pct}%\n";
+            if ($pct < 70) { echo "GAGAL: di bawah ambang 70% (NFR-MNT-01)\n"; exit(1); }
+          '

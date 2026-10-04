@@ -1,0 +1,18 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        - database/seeders
+        - config
+        - routes
+
+    # Level 6: menuntut tipe argumen & kembalian lengkap, termasuk anotasi
+    # generic pada relasi Eloquent. Seluruh kode Sprint 1 bersih di level ini.
+    # Rencana: naik ke level 7 setelah Sprint 3, saat modul kependudukan dan
+    # persuratan sudah stabil.
+    level: 6
+
+    # Tidak ada ignoreErrors. Bila suatu saat diperlukan, tulis alasannya di
+    # sini — pengecualian tanpa alasan adalah cara utang teknis menumpuk diam-diam.
