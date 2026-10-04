@@ -27,11 +27,20 @@ final class SidServiceProvider extends ServiceProvider
         $this->app->singleton(Google2FA::class, fn () => new Google2FA);
 
         /*
-         * AccessScope diikat per-permintaan dari pengguna yang sedang masuk.
-         * Repository WAJIB mendapatkannya lewat container, bukan membuat
-         * sendiri — sehingga tidak ada jalan membuat repository tanpa lingkup.
+         * AccessScope dihitung ULANG setiap kali diminta — SENGAJA transient,
+         * bukan scoped() atau singleton.
+         *
+         * MENGAPA INI PENTING: lingkup akses terikat pada pengguna yang sedang
+         * masuk. Bila objeknya di-cache di container, ia akan bertahan melewati
+         * batas permintaan pada runtime yang menggunakan ulang container
+         * (Laravel Octane, dan pengujian HTTP berurutan). Akibatnya pengguna
+         * berikutnya memakai lingkup akses pengguna sebelumnya — kebocoran data
+         * yang sulit terdeteksi karena hanya muncul pada permintaan kedua.
+         *
+         * Biayanya mendekati nol: Auth::user() mengembalikan objek yang sama
+         * dalam satu permintaan, dan loadMissing() tidak mengulang kueri.
          */
-        $this->app->scoped(
+        $this->app->bind(
             AccessScope::class,
             fn () => ($user = Auth::user()) instanceof User
                 ? AccessScope::forUser($user)

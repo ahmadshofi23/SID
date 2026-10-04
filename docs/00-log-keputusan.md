@@ -113,3 +113,39 @@ adalah pekerjaan konfigurasi (± 0,5 hari-orang/template), bukan pengembangan.
 Alasan Laravel + MySQL: kombinasi yang paling mudah di-*hosting* di Indonesia, paling
 banyak SDM-nya untuk pemeliharaan jangka panjang, dan tidak mengunci desa pada satu
 penyedia.
+
+---
+
+## KEP-005 — Panel admin: **Blade + Alpine.js**, bukan Inertia/React
+**Tanggal:** 2026-10-05 · **Status:** Disetujui (diambil Tech Lead, dapat ditinjau ulang)
+**Mengubah:** ADR-006 (docs/04 §5) dan docs/07 §3 yang semula menetapkan Inertia + React
+
+**Keputusan:** panel administrasi dibangun dengan **Blade (SSR) + Alpine.js**,
+memakai design token CSS dari Sprint 1. Tidak ada Inertia, React, atau Node pada
+jalur produksi.
+
+**Alasan:**
+1. **Serah terima (KEP-001, docs/01 §6).** Sistem ini harus dapat dirawat perangkat
+   desa atau Diskominfo kabupaten setelah serah terima. Satu bahasa (PHP) dan satu
+   kerangka kerja jauh lebih mungkin dirawat daripada PHP + Node + React + proses *build*.
+2. **Skala tidak menuntutnya.** 5.000 penduduk dan segelintir operator (docs/05 §8).
+   Keunggulan SPA — interaksi tanpa muat ulang pada data besar — tidak terasa di sini,
+   sementara biayanya (pipeline build, dua skill set, *bundle* 300 KB) tetap penuh.
+3. **Jaringan desa.** Blade SSR memberi halaman utuh dalam satu permintaan; tidak ada
+   *bundle* JavaScript yang harus diunduh sebelum layar pertama tampil (NFR-PERF-04).
+4. **Sprint 1 sudah menyediakan fondasinya.** Design token dan komponen dasar sudah
+   ada dan langsung terpakai, tanpa dikerjakan ulang dalam React.
+
+**Yang dikorbankan:**
+- Interaksi kaya (tabel dengan *inline editing*, *drag-drop*) lebih sulit. Untuk
+  kebutuhan Sprint 2–5 hal itu tidak diperlukan.
+- Pencarian *autocomplete* dan filter memerlukan sedikit JavaScript manual
+  (Alpine, ± 15 KB) alih-alih komponen siap pakai.
+
+**Mengapa ini reversibel dengan biaya rendah:** seluruh aturan bisnis berada di lapis
+*service* dan *repository* yang tidak mengetahui apa pun tentang UI. Mengganti view
+Blade dengan Inertia/React kelak berarti menulis ulang lapis presentasi saja
+(perkiraan 15–20 hari-orang), **tanpa** menyentuh logika, otorisasi, atau pengujian.
+
+> Bila Anda tetap menginginkan Inertia + React, beri tahu — penggantian paling murah
+> dilakukan sekarang, selagi baru satu modul yang dibangun.

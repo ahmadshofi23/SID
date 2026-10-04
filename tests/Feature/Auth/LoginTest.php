@@ -8,9 +8,6 @@ use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\MessageBag;
-use Illuminate\Support\ViewErrorBag;
-use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\TestDox;
 use Tests\TestCase;
@@ -255,30 +252,6 @@ final class LoginTest extends TestCase
         $this->post('/masuk', ['identifier' => $user->email, 'password' => self::PASSWORD]);
 
         $this->assertNotSame($before, session()->getId());
-    }
-
-    /**
-     * Ambil pesan galat validasi pertama untuk suatu field.
-     *
-     * Dengan driver sesi `array` (dipakai saat pengujian), ViewErrorBag
-     * tersimpan dalam bentuk array bersarang, bukan objek — karena itu kedua
-     * bentuk ditangani di sini.
-     */
-    private function errorMessage(TestResponse $response, string $field): string
-    {
-        $errors = $response->getSession()->get('errors');
-
-        if ($errors instanceof ViewErrorBag || $errors instanceof MessageBag) {
-            return (string) $errors->first($field);
-        }
-
-        if (is_array($errors)) {
-            $messages = $errors['default']['messages'][$field] ?? $errors[$field] ?? [];
-
-            return (string) (is_array($messages) ? ($messages[0] ?? '') : $messages);
-        }
-
-        return '';
     }
 
     #[Test]

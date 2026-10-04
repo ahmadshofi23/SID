@@ -84,9 +84,38 @@ final class Region extends Model
     public function buildPath(): string
     {
         $segment = Str::slug($this->level.'-'.$this->code);
-        $parent = $this->parent;
 
-        return $parent === null ? $segment : $parent->path.'/'.$segment;
+        // Memeriksa parent_id lebih dulu, bukan langsung mengakses ->parent:
+        // pada wilayah teratas (dusun) relasi itu tidak pernah dimuat, dan
+        // mengaksesnya memicu pelanggaran larangan lazy loading.
+        if ($this->parent_id === null) {
+            return $segment;
+        }
+
+        return $this->parent->path.'/'.$segment;
+    }
+
+    /**
+     * Bentuk ringkas untuk kolom tabel: "Krajan / RT 003".
+     *
+     * Nama RT saja TIDAK CUKUP: setiap dusun punya RT 001, sehingga kolom
+     * wilayah menjadi ambigu dan petugas tidak dapat membedakan dua warga
+     * dari dusun berbeda.
+     */
+    public function shortPath(): string
+    {
+        if ($this->level !== 'rt' || $this->parent_id === null) {
+            return $this->name;
+        }
+
+        $rw = $this->parent;
+        $dusun = $rw->parent_id === null ? null : $rw->parent;
+
+        if ($dusun === null) {
+            return $this->name;
+        }
+
+        return str_replace('Dusun ', '', $dusun->name).' / '.$this->name;
     }
 
     /** "Dusun Krajan / RW 02 / RT 003" */
@@ -97,7 +126,11 @@ final class Region extends Model
 
         while ($node !== null) {
             $names[] = $node->name;
-            $node = $node->parent;
+
+            // Berhenti berdasarkan parent_id, BUKAN dengan mengakses ->parent
+            // lalu memeriksa null — pada wilayah teratas relasi itu tidak
+            // dimuat, dan mengaksesnya memicu pelanggaran lazy loading.
+            $node = $node->parent_id === null ? null : $node->parent;
         }
 
         return implode(' / ', array_reverse($names));

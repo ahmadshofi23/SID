@@ -33,7 +33,7 @@ final class TwoFactorTest extends TestCase
     #[TestDox('Admin Desa tanpa 2FA dipaksa ke halaman pemasangan')]
     public function admin_tanpa_2fa_dipaksa_memasang(): void
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
 
         $this->actingAs($admin)
             ->get('/dashboard')
@@ -54,7 +54,7 @@ final class TwoFactorTest extends TestCase
     #[TestDox('Halaman pemasangan 2FA tetap dapat diakses walau 2FA diwajibkan')]
     public function halaman_pemasangan_tetap_dapat_diakses(): void
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
 
         $this->actingAs($admin)->get('/dua-faktor/pasang')->assertOk();
     }
@@ -63,7 +63,7 @@ final class TwoFactorTest extends TestCase
     #[TestDox('2FA aktif setelah kode benar; kode pemulihan diberikan sekali')]
     public function pemasangan_2fa_berhasil(): void
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
         $service = app(TwoFactorService::class);
         $secret = $service->generateSecret();
 
@@ -84,7 +84,7 @@ final class TwoFactorTest extends TestCase
     #[TestDox('Kode TOTP salah menolak pemasangan')]
     public function kode_salah_menolak_pemasangan(): void
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
         $secret = app(TwoFactorService::class)->generateSecret();
 
         $this->actingAs($admin)
@@ -136,7 +136,7 @@ final class TwoFactorTest extends TestCase
     #[TestDox('Kode pemulihan dapat dipakai dan langsung hangus (sekali pakai)')]
     public function kode_pemulihan_sekali_pakai(): void
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
         $service = app(TwoFactorService::class);
         $secret = $service->generateSecret();
         $codes = $service->confirm($admin, $secret);
@@ -156,7 +156,7 @@ final class TwoFactorTest extends TestCase
     #[TestDox('Rahasia TOTP disimpan terenkripsi, bukan teks terang')]
     public function rahasia_totp_terenkripsi(): void
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
         $secret = app(TwoFactorService::class)->generateSecret();
         app(TwoFactorService::class)->confirm($admin, $secret);
 
@@ -174,7 +174,7 @@ final class TwoFactorTest extends TestCase
 
     private function enabledTwoFactorAdmin(?string &$secret): User
     {
-        $admin = $this->userWithRole(Role::ADMIN_DESA);
+        $admin = $this->userWithRole(Role::ADMIN_DESA, withTwoFactor: false);
         $secret = app(TwoFactorService::class)->generateSecret();
         app(TwoFactorService::class)->confirm($admin, $secret);
 

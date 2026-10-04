@@ -87,8 +87,18 @@ final class AuditLogger
     /**
      * Catat perubahan model: hanya field yang BENAR-BENAR berubah,
      * beserta nilai lama dan baru (FR-PDK-07).
+     *
+     * `$before` WAJIB ditangkap pemanggil SEBELUM save(), karena Eloquent
+     * menyinkronkan atribut asli di dalam save(): sesudahnya `getOriginal()`
+     * sudah mengembalikan nilai BARU, sehingga riwayat akan mencatat
+     * "lama = baru" dan menjadi tidak berguna.
+     *
+     * Parameter dibuat wajib (bukan opsional) justru agar hal itu tidak
+     * mungkin terlupakan.
+     *
+     * @param  array<string, mixed>  $before  hasil $model->getOriginal() sebelum save
      */
-    public function logModelChange(string $action, Model $model): ?AuditLog
+    public function logModelChange(string $action, Model $model, array $before): ?AuditLog
     {
         $changes = [];
 
@@ -97,10 +107,15 @@ final class AuditLogger
                 continue;
             }
 
-            $changes[$field] = [
-                'old' => $model->getOriginal($field),
-                'new' => $new,
-            ];
+            $old = $before[$field] ?? null;
+
+            // Abaikan "perubahan" yang sebenarnya tidak mengubah apa pun
+            // (mis. '1' menjadi 1) agar riwayat tidak berisi derau.
+            if ((string) $old === (string) $new) {
+                continue;
+            }
+
+            $changes[$field] = ['old' => $old, 'new' => $new];
         }
 
         if ($changes === []) {

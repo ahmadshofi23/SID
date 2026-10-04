@@ -1,10 +1,10 @@
 # Sistem Informasi Desa (SID)
 
-**Status:** Sprint 1 (Fondasi) **selesai** — lihat [laporan Sprint 1](docs/14-laporan-sprint-1.md).
+**Status:** Sprint 2 (Kependudukan) **selesai** — lihat [laporan Sprint 2](docs/15-laporan-sprint-2.md).
 
 ```bash
 make setup && make serve     # http://localhost:8000
-make check                   # pint + phpstan + 87 uji (sama dengan CI)
+make check                   # pint + phpstan + 127 uji (sama dengan CI)
 ```
 
 Panduan pengembangan: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -24,7 +24,8 @@ siap dipakai sebagai dasar kontrak kerja, estimasi, dan implementasi.
 | KEP-001 | **Lingkup** | **Satu desa** (single-tenant) — tanpa `tenant_id`, tanpa multi-tenancy |
 | KEP-002 | **Basis data** | **MySQL 8.0** (InnoDB, utf8mb4) |
 | KEP-003 | **Jenis surat** | **Katalog umum 22 jenis** — 8 aktif saat pemasangan, 14 siap diaktifkan |
-| KEP-004 | **Stack** | **Laravel 13** + MySQL 8 + Redis + Gotenberg (Inertia/React mulai Sprint 2) |
+| KEP-004 | **Stack** | **Laravel 13** + MySQL 8 + Redis + Gotenberg |
+| KEP-005 | **Panel admin** | **Blade + CSS token** (bukan Inertia/React) — reversibel, lihat KEP-005 |
 
 Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log Keputusan](docs/00-log-keputusan.md)**.
 
@@ -47,6 +48,7 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | 12 | [Glosarium](docs/12-glosarium.md) | Semua | 1.0 |
 | 13 | [Katalog Jenis Surat & Template](docs/13-katalog-surat.md) | BA, Dev, Sekdes | 1.0 |
 | 14 | [Laporan Sprint 1](docs/14-laporan-sprint-1.md) | PM, Dev, Sponsor | 1.0 |
+| 15 | [Laporan Sprint 2](docs/15-laporan-sprint-2.md) | PM, Dev, Sponsor | 1.0 |
 
 ## Cara membaca
 - **Non-teknis (Kades, Sekdes, sponsor):** 00, 01, 02, 11, 13
@@ -60,6 +62,7 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | Skala sasaran | ± 5.000 penduduk, 1.500 KK, ± 50 surat/hari |
 | Ukuran basis data (5 tahun) | < 1 GB — lihat [05 §8](docs/05-model-data.md) |
 | Modul MVP | Kependudukan · Persuratan · Portal publik · Pengaduan · RBAC · Laporan |
+| Sudah jadi | Fondasi (S1) · Kependudukan: penduduk, KK, wilayah (S2) |
 | Estimasi MVP | 666 SP ≈ 340 hari-orang ≈ 17 minggu (tim 4 orang) |
 | Biaya operasional | ± Rp 400–600 rb/bulan |
 | Jenis surat siap pakai | 8 aktif + 14 tersedia ([13 §7](docs/13-katalog-surat.md)) |

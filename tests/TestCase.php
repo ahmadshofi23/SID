@@ -7,6 +7,7 @@ namespace Tests;
 use App\Models\Region;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Auth\TwoFactorService;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Database\Seeders\RoleSeeder;
@@ -14,6 +15,9 @@ use Database\Seeders\VillageSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
+use Illuminate\Testing\TestResponse;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -37,11 +41,35 @@ abstract class TestCase extends BaseTestCase
         ]);
     }
 
+    /**
+     * Ambil pesan galat validasi pertama untuk suatu field.
+     *
+     * Dengan driver sesi `array` (dipakai saat pengujian), ViewErrorBag
+     * tersimpan dalam bentuk array bersarang, bukan objek.
+     */
+    protected function errorMessage(TestResponse $response, string $field): string
+    {
+        $errors = $response->getSession()->get('errors');
+
+        if ($errors instanceof ViewErrorBag || $errors instanceof MessageBag) {
+            return (string) $errors->first($field);
+        }
+
+        if (is_array($errors)) {
+            $messages = $errors['default']['messages'][$field] ?? $errors[$field] ?? [];
+
+            return (string) (is_array($messages) ? ($messages[0] ?? '') : $messages);
+        }
+
+        return '';
+    }
+
     /** Buat pengguna dengan peran tertentu, opsional dibatasi wilayah. */
     protected function userWithRole(
         string $roleCode,
         ?Region $region = null,
         ?string $residentId = null,
+        bool $withTwoFactor = true,
     ): User {
         $role = Role::query()->where('code', $roleCode)->firstOrFail();
 
@@ -58,6 +86,21 @@ abstract class TestCase extends BaseTestCase
         ])->save();
 
         $user->roles()->attach($role->id, ['region_id' => $region?->id]);
+        $user->refresh();
+        $user->load('roles');
+
+        /*
+         * Peran Admin Desa & Kepala Desa WAJIB 2FA (FR-AUT-05). Tanpa 2FA aktif,
+         * middleware EnforceTwoFactor mengalihkan setiap permintaan ke halaman
+         * pemasangan — persis seperti di produksi. Maka uji yang memakai peran
+         * ini harus memulai dari keadaan 2FA sudah aktif, bila yang diuji bukan
+         * alur pemasangan 2FA itu sendiri.
+         */
+        if ($withTwoFactor && $user->requiresTwoFactor()) {
+            $user->setTwoFactorSecret(app(TwoFactorService::class)->generateSecret());
+            $user->two_factor_confirmed_at = now();
+            $user->save();
+        }
 
         return $user->fresh(['roles.permissions', 'resident']);
     }
