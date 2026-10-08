@@ -28,21 +28,45 @@ Akun contoh (hanya di lingkungan lokal) — kata sandi `kata-sandi-demo-2026`:
 | `bpd@sukamaju.desa.id` | Pengawas | — | Read-only + ekspor |
 | `warga@sukamaju.desa.id` | Warga | — | **Hanya anggota KK-nya** |
 
-### Masuk sebagai Admin Desa (2FA wajib)
+### Masuk sebagai Admin Desa (2FA wajib) — tanpa aplikasi autentikator
 
 Impor massal, pembukaan NIK penuh, dan pengelolaan pengguna **hanya dimiliki
-Admin Desa** — dan peran itu wajib verifikasi dua langkah (FR-AUT-05). Tanpa
-jalan keluar, seluruh fitur tersebut tidak dapat dicoba saat pengembangan.
+Admin Desa**, dan peran itu wajib verifikasi dua langkah (FR-AUT-05).
+
+**Anda tidak perlu memasang aplikasi autentikator apa pun.**
+
+Verifikasi dua langkah bekerja dengan satu *rahasia bersama*: deretan huruf acak
+yang disimpan di basis data dan disalin ke aplikasi ponsel. "Memindai kode QR"
+hanyalah cara praktis menyalin rahasia itu. Kode 6 angka lalu dihitung dari
+rahasia + waktu saat ini — jadi siapa pun yang memegang rahasianya dapat
+menghitung kode yang sama, termasuk server itu sendiri.
+
+`DemoDataSeeder` sudah mengaktifkan 2FA untuk akun contoh yang mewajibkannya,
+sehingga rahasianya ada di basis data sejak `make fresh`. Ambil kodenya:
 
 ```bash
 php artisan sid:totp admin@sukamaju.desa.id
 ```
 
-Perintah menampilkan kode 6 angka yang sedang berlaku. Ia **hanya bekerja di
-lingkungan lokal** — di produksi, 2FA tidak boleh dapat dilewati dari shell.
+```
+Akun  : admin@sukamaju.desa.id
+Kode  : 315039
+Berlaku 19 detik lagi.
+```
 
-Ingin memakai aplikasi autentikator sungguhan? Perintah yang sama juga
-menampilkan rahasia yang dapat dimasukkan manual ke Google Authenticator/Aegis.
+Kode berganti tiap 30 detik — jalankan lagi bila telanjur kedaluwarsa.
+
+**Memasang 2FA untuk akun baru** (mis. hasil `sid:create-admin`): halaman
+pemasangan menampilkan rahasianya dalam bentuk teks di bawah kode QR. Salin,
+lalu:
+
+```bash
+php artisan sid:totp --secret=WHY7WHRB6S5ZJSWYQNECX3WYF42GUZPP
+```
+
+Perintah ini **hanya bekerja di lingkungan lokal**. Di produksi, 2FA yang dapat
+dilewati dari shell sama saja dengan tidak ada 2FA — dan di sanalah seharusnya
+aplikasi autentikator sungguhan dipakai.
 
 ### Di mana fitur impor?
 

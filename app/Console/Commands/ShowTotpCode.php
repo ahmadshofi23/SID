@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\User;
-use App\Services\Auth\TwoFactorService;
 use Illuminate\Console\Command;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -24,11 +23,13 @@ use PragmaRX\Google2FA\Google2FA;
  */
 final class ShowTotpCode extends Command
 {
-    protected $signature = 'sid:totp {email : Email akun}';
+    protected $signature = 'sid:totp
+                            {email? : Email akun yang 2FA-nya sudah aktif}
+                            {--secret= : Hitung kode dari rahasia yang tampil di halaman pemasangan}';
 
     protected $description = 'Tampilkan kode verifikasi dua langkah yang sedang berlaku (lokal saja)';
 
-    public function handle(Google2FA $google2fa, TwoFactorService $twoFactor): int
+    public function handle(Google2FA $google2fa): int
     {
         /*
          * Pagar mutlak. Di produksi, perintah ini akan memberi siapa pun yang
@@ -44,7 +45,28 @@ final class ShowTotpCode extends Command
             return self::FAILURE;
         }
 
+        /*
+         * Mode rahasia langsung: untuk akun yang BARU memasang 2FA.
+         *
+         * Pada halaman pemasangan, rahasianya belum tersimpan di basis data —
+         * ia masih berada di sesi, menunggu dikonfirmasi dengan kode pertama.
+         * Tanpa mode ini, seseorang yang tidak punya aplikasi autentikator
+         * tidak akan pernah bisa menyelesaikan pemasangan.
+         */
+        if (($rawSecret = $this->option('secret')) !== null) {
+            return $this->printCode('(rahasia dari halaman pemasangan)', (string) $rawSecret, $google2fa);
+        }
+
         $email = (string) $this->argument('email');
+
+        if ($email === '') {
+            $this->components->error(
+                'Sebutkan email akun, atau pakai --secret=... untuk kode dari halaman pemasangan.'
+            );
+
+            return self::FAILURE;
+        }
+
         $user = User::query()->where('email', $email)->first();
 
         if ($user === null) {
@@ -69,13 +91,25 @@ final class ShowTotpCode extends Command
             return self::FAILURE;
         }
 
-        $code = $google2fa->getCurrentOtp($secret);
+        return $this->printCode($email, $secret, $google2fa);
+    }
+
+    private function printCode(string $label, string $secret, Google2FA $google2fa): int
+    {
+        try {
+            $code = $google2fa->getCurrentOtp($secret);
+        } catch (\Throwable $e) {
+            $this->components->error('Rahasia tidak valid: '.$e->getMessage());
+
+            return self::FAILURE;
+        }
+
         $secondsLeft = 30 - (int) (time() % 30);
 
         $this->newLine();
-        $this->line("  Akun  : <options=bold>{$email}</>");
+        $this->line("  Akun  : <options=bold>{$label}</>");
         $this->line("  Kode  : <fg=green;options=bold>{$code}</>");
-        $this->line("  Berlaku {$secondsLeft} detik lagi.");
+        $this->line("  Berlaku <options=bold>{$secondsLeft} detik</> lagi.");
         $this->newLine();
         $this->line('  Ingin memakai aplikasi autentikator sungguhan? Masukkan');
         $this->line('  rahasia ini secara manual di Google Authenticator/Aegis:');

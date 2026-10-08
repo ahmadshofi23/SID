@@ -9,6 +9,7 @@ use App\Models\Region;
 use App\Models\Resident;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Auth\TwoFactorService;
 use App\Support\NameNormalizer;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -154,7 +155,42 @@ final class DemoDataSeeder extends Seeder
             $user->roles()->syncWithoutDetaching([
                 $role->id => ['region_id' => $regionId],
             ]);
+
+            $this->enableTwoFactorIfRequired($user->fresh(['roles']));
         }
+    }
+
+    /**
+     * Aktifkan 2FA untuk akun contoh yang perannya mewajibkannya.
+     *
+     * MENGAPA INI PERLU ADA DI SEEDER:
+     *
+     * Admin Desa dan Kepala Desa wajib verifikasi dua langkah (FR-AUT-05).
+     * Tanpa 2FA aktif, middleware mengalihkan setiap permintaan ke halaman
+     * pemasangan — dan di sana pengguna diminta memindai kode QR dengan
+     * aplikasi autentikator.
+     *
+     * Saat pengembangan, itu berarti seluruh fitur yang HANYA dimiliki Admin
+     * Desa — impor massal, pembukaan NIK penuh, pengelolaan pengguna — tidak
+     * dapat dicoba sama sekali sebelum seseorang memasang aplikasi di ponselnya.
+     * Jalan buntu yang tidak ada hubungannya dengan apa yang sedang dikerjakan.
+     *
+     * Rahasianya dibuat acak (bukan nilai tetap yang ditulis di kode), dan
+     * kodenya diperoleh dengan:
+     *
+     *     php artisan sid:totp admin@sukamaju.desa.id
+     *
+     * Seeder ini hanya berjalan di lingkungan local & testing — lihat
+     * DatabaseSeeder.
+     */
+    private function enableTwoFactorIfRequired(User $user): void
+    {
+        if (! $user->requiresTwoFactor() || $user->hasTwoFactorEnabled()) {
+            return;
+        }
+
+        $service = app(TwoFactorService::class);
+        $service->confirm($user, $service->generateSecret());
     }
 
     private function rt(string $dusun, string $rw, string $rt): Region
