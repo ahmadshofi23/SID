@@ -16,9 +16,18 @@ setup: ## Pasang dependensi & siapkan basis data pengembangan
 	php artisan migrate --seed
 	npm run build
 
-serve: ## Jalankan server pengembangan (PHP + Vite)
-	npx concurrently -k -n php,vite -c green,magenta \
-		"php artisan serve --host=127.0.0.1 --port=8000" "npm run dev"
+serve: ## Jalankan server pengembangan (PHP + Vite + queue worker)
+	@# Queue worker WAJIB ikut jalan: impor massal dan render PDF (Sprint 5)
+	@# diproses di latar belakang. Tanpa worker, halaman impor menggantung di
+	@# "Menunggu" selamanya tanpa pesan galat apa pun — gejala yang sangat
+	@# membingungkan karena tidak ada yang tampak rusak.
+	@#
+	@# queue:listen (bukan queue:work) dipakai saat pengembangan agar perubahan
+	@# kode langsung terpakai tanpa perlu menghidupkan ulang worker.
+	npx concurrently -k -n php,vite,queue -c green,magenta,yellow \
+		"php artisan serve --host=127.0.0.1 --port=8000" \
+		"npm run dev" \
+		"php artisan queue:listen --tries=1 --timeout=900"
 
 build: ## Bangun aset produksi
 	npm run build

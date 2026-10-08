@@ -30,3 +30,15 @@ Schedule::call(fn (StatisticsService $statistics) => $statistics->refresh())
     ->hourly()
     ->name('segarkan-statistik-penduduk')
     ->withoutOverlapping();
+
+/*
+ * Berkas impor dihapus setelah 7 hari (R-20).
+ *
+ * Jeda 7 hari, bukan langsung: bila hasil impor dipersoalkan, berkas aslinya
+ * masih dapat diperiksa dalam waktu yang wajar. Lebih lama dari itu, ia hanya
+ * menjadi timbunan data pribadi tanpa guna.
+ */
+Schedule::command('sid:prune-import-files')
+    ->dailyAt('02:30')
+    ->name('bersihkan-berkas-impor')
+    ->withoutOverlapping();

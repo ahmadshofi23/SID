@@ -6,8 +6,14 @@
 
 ```bash
 make setup      # pasang dependensi, siapkan .env, migrasi + data contoh
-make serve      # http://localhost:8000
+make serve      # http://localhost:8000 (PHP + Vite + queue worker)
 ```
+
+> **Queue worker wajib jalan.** Impor massal dan render PDF diproses di latar
+> belakang. Tanpa worker, halaman impor menggantung di "Menunggu" tanpa pesan
+> galat — tidak ada yang tampak rusak, tetapi tidak ada yang terjadi.
+> `make serve` sudah menjalankannya; di produksi, worker adalah proses terpisah
+> (lihat `docker-compose.prod.yml` di docs/10 §3).
 
 Akun contoh (hanya di lingkungan lokal) — kata sandi `kata-sandi-demo-2026`:
 
