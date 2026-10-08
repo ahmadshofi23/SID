@@ -1,0 +1,17 @@
+NIK,Nama Lengkap,Tempat Lahir,Tanggal Lahir,Jenis Kelamin,Nomor KK,Hubungan Keluarga,Alamat,RT,RW,Dusun,Agama,Status Perkawinan,Pendidikan,Pekerjaan,Golongan Darah,Nama Ayah,Nama Ibu,Telepon,Kewarganegaraan
+3201011204820001,Suryadi,Sukamaju,1982-04-12,L,3201010000000011,Kepala Keluarga,Jl. Kenanga No. 7,001,001,Krajan,Islam,Kawin Tercatat,SLTA/Sederajat,Petani/Pekebun,B,Wagiman,Sumiyati,081234500001,WNI
+3201015508860002,Rohayati,Sukamaju,1986-08-15,P,3201010000000011,Istri,Jl. Kenanga No. 7,001,001,Krajan,Islam,Kawin Tercatat,SLTP/Sederajat,Mengurus Rumah Tangga,O,Sanusi,Marni,,WNI
+3201011003110003,Rizal Suryadi,Sukamaju,2011-03-10,L,3201010000000011,Anak,Jl. Kenanga No. 7,001,001,Krajan,Islam,Belum Kawin,Tamat SD/Sederajat,Pelajar/Mahasiswa,B,Suryadi,Rohayati,,WNI
+3201012507790004,Bambang Setiawan,Yogyakarta,1979-07-25,L,3201010000000012,Kepala Keluarga,Jl. Flamboyan No. 2,002,001,Krajan,Kristen,Kawin Tercatat,Diploma IV/Strata I,Guru,A,Hartono,Sri Lestari,081234500004,WNI
+3201016611830005,Maria Setiawan,Semarang,1983-11-26,P,3201010000000012,Istri,Jl. Flamboyan No. 2,002,001,Krajan,Kristen,Kawin Tercatat,Diploma IV/Strata I,Perawat,AB,Yohanes,Theresia,,WNI
+3201010209650006,Haji Mustofa,Sukamaju,1965-09-02,L,3201010000000013,Kepala Keluarga,Jl. Melati No. 21,001,002,Krajan,Islam,Kawin Tercatat,Tamat SD/Sederajat,Wiraswasta,O,Abdullah,Siti Aisyah,081234500006,WNI
+3201014703700007,Nur Hidayah,Sukamaju,1970-03-07,P,3201010000000013,Istri,Jl. Melati No. 21,001,002,Krajan,Islam,Kawin Tercatat,Tamat SD/Sederajat,Pedagang,O,Karsono,Painah,,WNI
+3201011508950008,Dewi Anggraeni,Sukamaju,1995-08-15,P,3201010000000014,Kepala Keluarga,Jl. Anggrek No. 5,001,001,Sidomulyo,Islam,Belum Kawin,Diploma IV/Strata I,Bidan,A,Sutrisno,Yuliana,081234500008,WNI
+3201010101400009,Sastro Wijoyo,Sukamaju,1940-01-01,L,3201010000000015,Kepala Keluarga,Jl. Mawar No. 3,002,001,Sidomulyo,Islam,Cerai Mati,Tidak/Belum Sekolah,Pensiunan,B,Kromo,Jinem,,WNI
+3201011906000010,Fitri Handayani,Bandung,2000-06-19,P,3201010000000016,Kepala Keluarga,Jl. Dahlia No. 9,003,001,Krajan,Islam,Belum Kawin,SLTA/Sederajat,Karyawan Swasta,O,Hendra,Ratna,081234500010,WNI
+32010112,NIK Terlalu Pendek,Sukamaju,1990-01-01,L,,Anak,Jl. Rusak No. 1,001,001,Krajan,Islam,Belum Kawin,,,,,,,
+3201011204820001,Suryadi Kembar,Sukamaju,1982-04-12,L,,Anak,Jl. Kenanga No. 7,001,001,Krajan,Islam,Belum Kawin,,,,,,,
+3201010101990012,,Sukamaju,1999-01-01,P,,Anak,Jl. Tanpa Nama,001,001,Krajan,Islam,Belum Kawin,,,,,,,
+3201010101300013,Tanggal Masa Depan,Sukamaju,2090-01-01,L,,Anak,Jl. Waktu No. 1,001,001,Krajan,Islam,Belum Kawin,,,,,,,
+3201010101850014,Jenis Kelamin Salah,Sukamaju,1985-01-01,X,,Anak,Jl. Keliru No. 1,001,001,Krajan,Islam,Belum Kawin,,,,,,,
+3201010101880015,Wilayah Tidak Dikenal,Sukamaju,1988-01-01,P,,Anak,Jl. Antah No. 1,888,999,Dusun Antah Berantah,Islam,Belum Kawin,,,,,,,
