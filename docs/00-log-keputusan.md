@@ -116,13 +116,19 @@ penyedia.
 
 ---
 
-## KEP-005 — Panel admin: **Blade + Alpine.js**, bukan Inertia/React
+## KEP-005 — Panel admin: **Blade + JavaScript minimal**, bukan Inertia/React
 **Tanggal:** 2026-10-05 · **Status:** Disetujui (diambil Tech Lead, dapat ditinjau ulang)
 **Mengubah:** ADR-006 (docs/04 §5) dan docs/07 §3 yang semula menetapkan Inertia + React
 
-**Keputusan:** panel administrasi dibangun dengan **Blade (SSR) + Alpine.js**,
-memakai design token CSS dari Sprint 1. Tidak ada Inertia, React, atau Node pada
-jalur produksi.
+**Keputusan:** panel administrasi dibangun dengan **Blade (SSR) + JavaScript biasa
+seperlunya**, memakai design token CSS dari Sprint 1. Tidak ada Inertia, React, Vue,
+atau Node pada jalur produksi.
+
+> **Koreksi 2026-10-08:** versi awal keputusan ini menyebut "Blade + Alpine.js".
+> Yang benar-benar dibangun pada Sprint 2 adalah Blade + **JavaScript biasa 3 KB**
+> (`public/js/sid.js`) — Alpine tidak jadi dipakai karena kebutuhannya ternyata
+> hanya dua: membuka data pribadi dan mencegah kirim ganda. Keduanya tidak
+> memerlukan kerangka kerja apa pun. Dokumen diluruskan agar sesuai kenyataan.
 
 **Alasan:**
 1. **Serah terima (KEP-001, docs/01 §6).** Sistem ini harus dapat dirawat perangkat
@@ -139,16 +145,16 @@ jalur produksi.
 **Yang dikorbankan:**
 - Interaksi kaya (tabel dengan *inline editing*, *drag-drop*) lebih sulit. Untuk
   kebutuhan Sprint 2–5 hal itu tidak diperlukan.
-- Pencarian *autocomplete* dan filter memerlukan sedikit JavaScript manual
-  (Alpine, ± 15 KB) alih-alih komponen siap pakai.
+- Pencarian *autocomplete* dan filter memerlukan JavaScript yang ditulis manual
+  alih-alih komponen siap pakai.
 
 **Mengapa ini reversibel dengan biaya rendah:** seluruh aturan bisnis berada di lapis
 *service* dan *repository* yang tidak mengetahui apa pun tentang UI. Mengganti view
 Blade dengan Inertia/React kelak berarti menulis ulang lapis presentasi saja
 (perkiraan 15–20 hari-orang), **tanpa** menyentuh logika, otorisasi, atau pengujian.
 
-> Bila Anda tetap menginginkan Inertia + React, beri tahu — penggantian paling murah
-> dilakukan sekarang, selagi baru satu modul yang dibangun.
+**Catatan arah ke depan (2026-10-08):** bila kelak dibutuhkan kerangka kerja
+JavaScript, **Vue lebih sesuai daripada React** untuk proyek ini — lihat KEP-007.
 
 ---
 
@@ -186,3 +192,66 @@ bukan saat kunci dibutuhkan dalam keadaan darurat.
 **Kapan wajib dilakukan:** sebelum baris data warga **asli** yang pertama ditulis —
 bukan sebelum go-live. Selama isinya masih data contoh, kunci hilang tidak berakibat
 apa-apa; tinggal dibuat ulang.
+
+---
+
+## KEP-007 — Bila kelak perlu kerangka kerja JS: **Vue, dan hanya di layar yang membutuhkan**
+**Tanggal:** 2026-10-08 · **Status:** Arah yang disepakati (belum dijalankan)
+**Melengkapi:** KEP-005
+
+### Keputusan
+1. Bila suatu saat dibutuhkan kerangka kerja JavaScript, pilihannya adalah
+   **Vue**, bukan React.
+2. Penerapannya **tidak menyeluruh**. Vue dipasang sebagai *island* — hanya pada
+   layar tertentu yang benar-benar menuntutnya. Sisa aplikasi tetap Blade.
+3. Keputusan itu **ditunda sampai Sprint 4**, saat kebutuhan nyatanya muncul.
+
+### Mengapa Vue, bukan React
+
+| Pertimbangan | Vue | React |
+|--------------|-----|-------|
+| Bentuk kode tampilan | Template mirip HTML — dekat dengan Blade | JSX: HTML ditulis di dalam JavaScript |
+| Kurva belajar dari latar PHP | Lebih landai | Lebih terjal |
+| Pasangan tradisional Laravel di Indonesia | Vue (bawaan Laravel selama bertahun-tahun) | Belakangan lebih umum secara global, kurang di kalangan Laravel lokal |
+| Kemudahan dipakai sebagian saja | Mudah — cukup tempelkan pada satu elemen | Bisa, tetapi lebih berat |
+
+Butir terakhir yang paling menentukan untuk proyek ini: Vue dapat dipasang hanya
+pada satu halaman tanpa mengubah apa pun di halaman lain.
+
+### Mengapa *island*, bukan penggantian menyeluruh
+
+Mengganti seluruh panel ke Vue berarti menulis ulang ± 10 layar yang sudah bekerja,
+menambahkan Node.js dan proses *build* ke jalur rilis, dan menaikkan jumlah
+teknologi yang harus dikuasai perawat sistem dari satu menjadi tiga — demi
+keuntungan yang tidak terasa pada layar CRUD biasa.
+
+Pendekatan *island* membayar biaya itu **hanya** di tempat yang memberi imbalan.
+
+### Di mana imbalannya nyata
+
+Satu layar sudah terlihat akan menuntutnya: **penyunting formulir dinamis jenis
+surat** (FR-SRT-03, Sprint 4). Di sana petugas menyusun sendiri daftar isian untuk
+tiap jenis surat — menambah, menghapus, mengubah urutan, menentukan jenis isian,
+dengan pratinjau langsung. Membangun itu dengan JavaScript manual memang bisa,
+tetapi akan menjadi bagian kode yang paling rumit dan paling rapuh di seluruh
+sistem.
+
+Layar lain yang mungkin menyusul: penyunting template surat (Sprint 5) dan peta
+GIS (Fase 3).
+
+Layar yang **tidak** membutuhkannya: seluruh CRUD kependudukan, impor data,
+daftar, saringan, laporan, dan portal publik.
+
+### Konsekuensi yang diterima
+- Dua gaya penulisan tampilan hidup berdampingan (Blade dan Vue). Dapat
+  membingungkan bila batasnya tidak jelas — karena itu aturannya ditulis di sini:
+  Vue hanya untuk layar yang terdaftar di atas, dan setiap penambahan memerlukan
+  alasan tertulis.
+- Proses *build* masuk ke jalur rilis begitu *island* pertama dipasang. Pipeline
+  CI perlu tahap tambahan.
+
+### Yang perlu dibereskan lebih dulu
+`package.json` saat ini masih memuat Vite dan Tailwind dari kerangka bawaan
+Laravel, padahal **tidak ada satu pun view yang memakainya**. Perlu dibersihkan
+atau justru dimanfaatkan saat *island* pertama dipasang — jangan dibiarkan
+menggantung sebagai ketergantungan yang tidak jelas statusnya.

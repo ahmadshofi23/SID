@@ -27,6 +27,7 @@ siap dipakai sebagai dasar kontrak kerja, estimasi, dan implementasi.
 | KEP-004 | **Stack** | **Laravel 13** + MySQL 8 + Redis + Gotenberg |
 | KEP-005 | **Panel admin** | **Blade + CSS token** (bukan Inertia/React) — reversibel, lihat KEP-005 |
 | KEP-006 | **Cadangan kunci data pribadi** | Dicetak di kertas, dua pemegang, dua lokasi — [prosedurnya](ops/runbook/pencadangan-kunci.md) |
+| KEP-007 | **Kerangka kerja JS (bila perlu)** | **Vue**, hanya sebagai *island* di layar yang menuntut — diputuskan Sprint 4 |
 
 Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log Keputusan](docs/00-log-keputusan.md)**.
 
