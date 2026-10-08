@@ -158,12 +158,18 @@ Rincian & yang dikorbankan: [00 Log Keputusan](00-log-keputusan.md) KEP-005.
 | Risiko | Sebelum | Sesudah | Alasan |
 |--------|---------|---------|--------|
 | **R-15** Bug otorisasi lolos karena tiadanya RLS | 8 | **6** | Lapis uji HTTP ditambahkan; satu bug laten (§3.1) ditemukan & ditutup sebelum produksi |
-| **R-18** Kehilangan kunci PII | 10 | **10** | **Belum ada perbaikan — menunggu keputusan Anda** |
+| **R-18** Kehilangan kunci PII | 10 | **4** | **Ditutup (KEP-006):** dua pemegang, dicetak di kertas; prosedur + alat verifikasi tersedia |
 
-**R-18 masih terbuka.** Kunci `PII_ENCRYPTION_KEY` harus dicadangkan terpisah dari
-cadangan basis data. Belum ada prosedurnya, dan ini **wajib disepakati sebelum data
-warga asli masuk** — bukan sebelum go-live, melainkan sebelum baris data nyata
-pertama ditulis.
+**R-18 ditutup pada 2026-10-08** lewat KEP-006: kunci dicadangkan di kertas, dipegang
+dua orang di dua lokasi berbeda. Prosedur lengkap beserta formulir cetak ada di
+[ops/runbook/pencadangan-kunci.md](../ops/runbook/pencadangan-kunci.md), dan
+verifikasi salinan dibantu perintah `php artisan sid:pii-key --verify`.
+
+Risiko sisa (skor 4) adalah hal yang tidak dapat dihilangkan teknologi: kertas bisa
+terbakar atau hilang. Itu sebabnya dua salinan di dua lokasi.
+
+**Yang masih harus dilakukan manusia:** menjalankan prosedur itu sebelum data warga
+asli yang pertama dimasukkan.
 
 ### Risiko baru
 | ID | Risiko | P | D | Skor | Mitigasi |
@@ -183,6 +189,6 @@ Tersedia untuk langsung dipakai:
 - Penjaga arsitektur & uji otorisasi yang otomatis menguji modul baru.
 
 **Perlu diputuskan sebelum Sprint 3:**
-1. **R-18** — prosedur pencadangan kunci PII (siapa pemegang, disimpan di mana).
+1. ~~Prosedur pencadangan kunci PII~~ **Terjawab (KEP-006).** Tinggal dijalankan.
 2. Format berkas impor: template Excel resmi kami, atau mengikuti format ekspor
    sistem yang sudah dipakai desa (OpenSID/Prodeskel)? Menentukan pemetaan kolom.

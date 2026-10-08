@@ -85,3 +85,19 @@ tertangkap sebelum rilis, bukan di server produksi.
 | `php artisan sid:generate-pii-keys` | Hasilkan kunci enkripsi data pribadi |
 | `php artisan sid:harden-audit-log` | Cabut UPDATE/DELETE pada audit log (**wajib di produksi**) |
 | `php artisan sid:verify-audit-chain` | Periksa apakah audit log pernah diubah di luar aplikasi |
+
+## Kunci data pribadi
+
+Kunci enkripsi NIK & nomor KK **tidak dapat dipulihkan bila hilang**. Prosedur
+pencadangannya (dua pemegang, dicetak di kertas — KEP-006) ada di
+[ops/runbook/pencadangan-kunci.md](ops/runbook/pencadangan-kunci.md) dan **wajib
+dijalankan sebelum data warga asli yang pertama dimasukkan**.
+
+| Perintah | Kegunaan |
+|----------|----------|
+| `php artisan sid:pii-key` | Tampilkan sidik jari kunci (aman dilihat orang lain) |
+| `php artisan sid:pii-key --verify` | Periksa apakah salinan kertas cocok dengan server |
+
+Tidak ada perintah yang menampilkan kunci itu sendiri — itu disengaja. Kunci yang
+pernah tampil di layar tertinggal di riwayat terminal, rekaman rapat daring, dan
+log sesi SSH.

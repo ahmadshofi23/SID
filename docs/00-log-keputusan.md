@@ -149,3 +149,40 @@ Blade dengan Inertia/React kelak berarti menulis ulang lapis presentasi saja
 
 > Bila Anda tetap menginginkan Inertia + React, beri tahu — penggantian paling murah
 > dilakukan sekarang, selagi baru satu modul yang dibangun.
+
+---
+
+## KEP-006 — Pencadangan kunci data pribadi: **dua pemegang, dicetak di kertas**
+**Tanggal:** 2026-10-08 · **Status:** Disetujui · **Pemutus:** Pemilik proyek
+**Menutup risiko:** R-18 (docs/14 §5, docs/15 §6)
+
+**Keputusan:** `PII_ENCRYPTION_KEY` dan `PII_HASH_PEPPER` dicadangkan dengan cara
+**dicetak/ditulis di kertas**, dipegang **dua orang** secara terpisah.
+
+**Mengapa kertas justru pilihan yang baik di sini — bukan kompromi:**
+- Tidak dapat diretas dari jarak jauh. Ancaman terbesar terhadap kunci ini adalah
+  penyerang yang sudah masuk ke server atau ke penyimpanan cadangan; kertas di
+  brankas berada sepenuhnya di luar jangkauan itu.
+- Tidak bergantung pada langganan, listrik, atau perangkat yang bisa rusak.
+- Dapat dibaca siapa pun 10 tahun lagi tanpa perangkat lunak khusus.
+
+**Yang dikorbankan:** kertas bisa terbakar, basah, hilang, atau salah dibaca
+(angka 0 vs huruf O). Karena itu dua pemegang, dan karena itu disediakan perintah
+verifikasi di §Prosedur agar kesalahan penyalinan ketahuan **saat itu juga**,
+bukan saat kunci dibutuhkan dalam keadaan darurat.
+
+**Aturan mutlak yang menyertainya:**
+1. Kertas **TIDAK BOLEH** disimpan di tempat yang sama dengan cadangan basis data.
+   Menyimpannya bersama membuat seluruh enkripsi tidak ada gunanya — seperti
+   menempelkan kunci rumah di pintu depan.
+2. Kunci **TIDAK BOLEH** dikirim lewat WhatsApp, email, atau difoto. Riwayat
+   percakapan dan galeri ponsel adalah tempat kebocoran yang paling umum.
+3. Dua pemegang menyimpan di **dua lokasi fisik berbeda** (mis. brankas kantor desa
+   dan brankas/tempat terkunci di rumah pemegang kedua). Satu kebakaran tidak boleh
+   menghabiskan keduanya.
+
+**Prosedur lengkap:** [ops/runbook/pencadangan-kunci.md](../ops/runbook/pencadangan-kunci.md)
+
+**Kapan wajib dilakukan:** sebelum baris data warga **asli** yang pertama ditulis —
+bukan sebelum go-live. Selama isinya masih data contoh, kunci hilang tidak berakibat
+apa-apa; tinggal dibuat ulang.

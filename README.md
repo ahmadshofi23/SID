@@ -4,7 +4,7 @@
 
 ```bash
 make setup && make serve     # http://localhost:8000
-make check                   # pint + phpstan + 127 uji (sama dengan CI)
+make check                   # pint + phpstan + 132 uji (sama dengan CI)
 ```
 
 Panduan pengembangan: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -26,6 +26,7 @@ siap dipakai sebagai dasar kontrak kerja, estimasi, dan implementasi.
 | KEP-003 | **Jenis surat** | **Katalog umum 22 jenis** — 8 aktif saat pemasangan, 14 siap diaktifkan |
 | KEP-004 | **Stack** | **Laravel 13** + MySQL 8 + Redis + Gotenberg |
 | KEP-005 | **Panel admin** | **Blade + CSS token** (bukan Inertia/React) — reversibel, lihat KEP-005 |
+| KEP-006 | **Cadangan kunci data pribadi** | Dicetak di kertas, dua pemegang, dua lokasi — [prosedurnya](ops/runbook/pencadangan-kunci.md) |
 
 Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log Keputusan](docs/00-log-keputusan.md)**.
 
@@ -72,11 +73,13 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 Tidak memblokir pengembangan sekarang, tetapi dibutuhkan sebelum sprint terkait
 (rinci di [11 §8](docs/11-roadmap-estimasi.md)):
 
-1. **Model hosting** — VPS penyedia atau on-premise kabupaten → sebelum Sprint 1 selesai.
-2. **Kondisi data awal** — digital, hardcopy, atau belum ada → sebelum Sprint 3.
-3. **Pola penomoran surat** ⚠ — ambil dari arsip surat asli desa → sebelum surat pertama
+1. **Jalankan prosedur cadangan kunci** ⚠ — [ops/runbook/pencadangan-kunci.md](ops/runbook/pencadangan-kunci.md)
+   → **sebelum data warga asli yang pertama dimasukkan**, bukan sebelum go-live.
+2. **Model hosting** — VPS penyedia atau on-premise kabupaten.
+3. **Kondisi data awal** — digital, hardcopy, atau belum ada → sebelum Sprint 3.
+4. **Pola penomoran surat** ⚠ — ambil dari arsip surat asli desa → sebelum surat pertama
    terbit. Paling mudah terlewat, paling mahal diperbaiki.
-4. **Pejabat penanda tangan** per jenis surat → sebelum Sprint 5.
+5. **Pejabat penanda tangan** per jenis surat → sebelum Sprint 5.
 
 ## Catatan penting
 
