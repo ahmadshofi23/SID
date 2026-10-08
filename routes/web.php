@@ -6,9 +6,13 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Population\AnomalyController;
 use App\Http\Controllers\Population\FamilyController;
+use App\Http\Controllers\Population\ImportController;
+use App\Http\Controllers\Population\MutationController;
 use App\Http\Controllers\Population\RegionController;
 use App\Http\Controllers\Population\ResidentController;
+use App\Http\Controllers\Population\StatisticsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -102,6 +106,44 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:keluarga.ubah')->name('keluarga.move-member');
         Route::post('keluarga/{id}/nomor-kk', [FamilyController::class, 'revealKkNumber'])
             ->middleware('izin:data_pribadi.lihat_penuh')->name('keluarga.reveal-kk');
+
+        // Mutasi penduduk (Sprint 3)
+        Route::get('mutasi', [MutationController::class, 'index'])
+            ->middleware('izin:mutasi.lihat')->name('mutasi.index');
+        Route::get('penduduk/{id}/mutasi', [MutationController::class, 'create'])
+            ->middleware('izin:mutasi.tambah')->name('mutasi.create');
+        Route::post('penduduk/{id}/mutasi', [MutationController::class, 'store'])
+            ->middleware('izin:mutasi.tambah')->name('mutasi.store');
+
+        // Statistik (Sprint 3)
+        Route::get('statistik', [StatisticsController::class, 'index'])
+            ->middleware('izin:penduduk.lihat')->name('statistik.index');
+        Route::post('statistik/segarkan', [StatisticsController::class, 'refresh'])
+            ->middleware('izin:laporan.lihat')->name('statistik.refresh');
+
+        // Laporan anomali data (Sprint 3)
+        Route::get('anomali', [AnomalyController::class, 'index'])
+            ->middleware('izin:penduduk.lihat')->name('anomali.index');
+
+        // Impor massal (Sprint 3)
+        Route::get('impor', [ImportController::class, 'index'])
+            ->middleware('izin:penduduk.impor')->name('impor.index');
+        Route::get('impor/template', [ImportController::class, 'template'])
+            ->middleware('izin:penduduk.impor')->name('impor.template');
+        Route::post('impor', [ImportController::class, 'store'])
+            ->middleware('izin:penduduk.impor')->name('impor.store');
+        Route::get('impor/{id}', [ImportController::class, 'show'])
+            ->middleware('izin:penduduk.impor')->name('impor.show');
+        Route::get('impor/{id}/status', [ImportController::class, 'status'])
+            ->middleware('izin:penduduk.impor')->name('impor.status');
+        Route::post('impor/{id}/jalankan', [ImportController::class, 'confirm'])
+            ->middleware('izin:penduduk.impor')->name('impor.confirm');
+        Route::post('impor/{id}/batal', [ImportController::class, 'cancel'])
+            ->middleware('izin:penduduk.impor')->name('impor.cancel');
+
+        // Ekspor (Sprint 3)
+        Route::get('penduduk-ekspor', [ResidentController::class, 'export'])
+            ->middleware('izin:penduduk.ekspor')->name('penduduk.export');
 
         // Wilayah
         Route::get('wilayah', [RegionController::class, 'index'])

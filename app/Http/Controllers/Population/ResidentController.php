@@ -13,6 +13,7 @@ use App\Repositories\FamilyRepository;
 use App\Repositories\ResidentRepository;
 use App\Services\Population\ChangeHistoryService;
 use App\Services\Population\RegionService;
+use App\Services\Population\ResidentExporter;
 use App\Services\Population\ResidentService;
 use App\Support\ReferenceData;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Modul kependudukan — FR-PDK-01, 04, 05, 06, 07.
@@ -236,6 +238,22 @@ final class ResidentController extends Controller
             'nik' => $service->revealNik($resident),
             'catatan' => 'Pembukaan data ini tercatat di log aktivitas.',
         ]);
+    }
+
+    /**
+     * Ekspor data penduduk — FR-PDK-12.
+     *
+     * NIK penuh hanya disertakan bila pengguna punya izin khusus, dan setiap
+     * ekspor tercatat di audit log beserta jumlah baris & saringannya.
+     */
+    public function export(Request $request, ResidentExporter $exporter): StreamedResponse
+    {
+        $this->authorize('penduduk.ekspor');
+
+        return $exporter->stream(
+            $request->only(['region_id', 'gender', 'status']),
+            includeFullNik: (bool) $request->user()?->can('data_pribadi.lihat_penuh'),
+        );
     }
 
     /** Autocomplete pencarian penduduk (FR-PDK-04). */

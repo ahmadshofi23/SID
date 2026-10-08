@@ -1,10 +1,10 @@
 # Sistem Informasi Desa (SID)
 
-**Status:** Sprint 2 (Kependudukan) **selesai** — lihat [laporan Sprint 2](docs/15-laporan-sprint-2.md).
+**Status:** Sprint 3 (Data & Mutasi) **selesai** — lihat [laporan Sprint 3](docs/17-laporan-sprint-3.md).
 
 ```bash
 make setup && make serve     # http://localhost:8000 (termasuk npm ci && npm run build)
-make check                   # pint + phpstan + vue-tsc + 135 uji (sama dengan CI)
+make check                   # pint + phpstan + vue-tsc + 165 uji (sama dengan CI)
 ```
 
 Panduan pengembangan: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -54,6 +54,7 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | 14 | [Laporan Sprint 1](docs/14-laporan-sprint-1.md) | PM, Dev, Sponsor | 1.0 |
 | 15 | [Laporan Sprint 2](docs/15-laporan-sprint-2.md) | PM, Dev, Sponsor | 1.1 |
 | 16 | [Perbaikan Pasca-Sprint 2](docs/16-perbaikan-pasca-sprint-2.md) | Dev | 1.0 |
+| 17 | [Laporan Sprint 3](docs/17-laporan-sprint-3.md) | PM, Dev, Sponsor | 1.0 |
 
 ## Cara membaca
 - **Non-teknis (Kades, Sekdes, sponsor):** 00, 01, 02, 11, 13
@@ -67,7 +68,7 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | Skala sasaran | ± 5.000 penduduk, 1.500 KK, ± 50 surat/hari |
 | Ukuran basis data (5 tahun) | < 1 GB — lihat [05 §8](docs/05-model-data.md) |
 | Modul MVP | Kependudukan · Persuratan · Portal publik · Pengaduan · RBAC · Laporan |
-| Sudah jadi | Fondasi (S1) · Kependudukan: penduduk, KK, wilayah (S2) |
+| Sudah jadi | Fondasi (S1) · Kependudukan (S2) · Impor, mutasi, statistik, anomali (S3) |
 | Estimasi MVP | 666 SP ≈ 340 hari-orang ≈ 17 minggu (tim 4 orang) |
 | Biaya operasional | ± Rp 400–600 rb/bulan |
 | Jenis surat siap pakai | 8 aktif + 14 tersedia ([13 §7](docs/13-katalog-surat.md)) |

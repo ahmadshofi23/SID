@@ -104,6 +104,32 @@ final class FamilyRepository extends GuardedRepository
      * Apakah nomor KK sudah dipakai keluarga lain (lihat catatan keunikan
      * se-desa pada ResidentRepository::nikTakenByOther).
      */
+    /**
+     * Cari kartu keluarga berdasarkan nomor KK, MENGABAIKAN lingkup akses.
+     * Khusus impor massal — lihat catatan di ResidentRepository.
+     */
+    public function findByKkNumberIgnoringScope(string $kkNumber): ?Family
+    {
+        $hash = app(PiiCipher::class)->hash(Nik::normalize($kkNumber));
+
+        return Family::query()->where('kk_number_hash', $hash)->first();
+    }
+
+    /**
+     * Buat kartu keluarga dari baris impor.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function createFromImport(string $kkNumber, array $attributes): Family
+    {
+        $family = new Family;
+        $family->setKkNumber($kkNumber);
+        $family->fill($attributes);
+        $family->save();
+
+        return $family;
+    }
+
     public function kkNumberTakenByOther(string $kkNumber, ?string $exceptId = null): bool
     {
         $hash = app(PiiCipher::class)->hash(Nik::normalize($kkNumber));

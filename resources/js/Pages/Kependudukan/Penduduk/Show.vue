@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
-import { ChevronRight, Pencil, History, Users } from '@lucide/vue'
+import { ChevronRight, Pencil, History, Users, ArrowRightLeft } from '@lucide/vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppAlert from '@/Components/AppAlert.vue'
@@ -66,6 +66,15 @@ const keluarga = [
             </div>
 
             <div class="flex flex-wrap gap-2">
+                <AppButton
+                    v-if="can('mutasi.tambah')"
+                    :href="`/kependudukan/penduduk/${resident.id}/mutasi`"
+                    variant="secondary"
+                >
+                    <ArrowRightLeft class="size-4" aria-hidden="true" />
+                    Catat Mutasi
+                </AppButton>
+
                 <AppButton
                     v-if="can('penduduk.ubah')"
                     :href="`/kependudukan/penduduk/${resident.id}/ubah`"

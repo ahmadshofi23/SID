@@ -231,6 +231,315 @@ final class ResidentRepository extends GuardedRepository
      * ganda karena tidak melihat penduduk dusun lain. Itu sebabnya metode ini
      * hanya mengembalikan boolean — tidak pernah membocorkan data penduduknya.
      */
+    /**
+     * Telusuri penduduk dalam lingkup pengguna untuk ekspor.
+     *
+     * Memakai `chunkById` agar berapa pun jumlah penduduknya, hanya 500 baris
+     * yang berada di memori pada satu waktu.
+     *
+     * @param  callable(Resident): void  $callback
+     */
+    public function eachForExport(callable $callback): void
+    {
+        $this->scoped()
+            ->with(['region.parent.parent', 'family'])
+            ->orderBy('full_name_norm')
+            ->chunkById(500, function ($residents) use ($callback): void {
+                foreach ($residents as $resident) {
+                    $callback($resident);
+                }
+            });
+    }
+
+    /* ====================== Pemeriksaan anomali (FR-PDK-13) ==================
+     | Seluruh pemeriksaan di bawah MENGHORMATI lingkup akses: Kepala Dusun
+     | hanya melihat anomali di dusunnya. Itu disengaja — laporan anomali
+     | adalah alat kerja, bukan pintu belakang menuju data wilayah lain.
+     */
+
+    /**
+     * NIK yang dipakai lebih dari satu penduduk aktif.
+     *
+     * Tidak mungkin terjadi lewat antarmuka (ditahan indeks unik), tetapi dapat
+     * muncul dari perbaikan data manual lewat SQL atau migrasi dari sistem lama.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function duplicateNikGroups(int $limit = 50): array
+    {
+        $hashes = $this->scoped()
+            ->toBase()
+            ->select('nik_hash')
+            ->groupBy('nik_hash')
+            ->havingRaw('COUNT(*) > 1')
+            ->limit($limit)
+            ->pluck('nik_hash');
+
+        if ($hashes->isEmpty()) {
+            return [];
+        }
+
+        return $this->scoped()
+            ->whereIn('nik_hash', $hashes)
+            ->orderBy('nik_hash')
+            ->get()
+            ->groupBy('nik_hash')
+            ->map(fn ($group): array => [
+                'nik' => $group->first()->nik_masked,
+                'penduduk' => $group->map(fn (Resident $r): array => [
+                    'id' => $r->id,
+                    'nama' => $r->full_name,
+                    'lahir' => $r->birth_date->format('d-m-Y'),
+                ])->values()->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Nama yang sangat mirip dalam satu wilayah — calon data ganda (R-19).
+     *
+     * Kemiripan diukur dari nama ternormalisasi: tanpa gelar, tanda baca, dan
+     * huruf besar/kecil. "Drs. Bambang Wijaya" dan "bambang wijaya" karena itu
+     * terdeteksi sebagai sama.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function similarNames(int $limit = 50): array
+    {
+        $names = $this->scoped()
+            ->toBase()
+            ->select('full_name_norm', 'region_id')
+            ->groupBy('full_name_norm', 'region_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->limit($limit)
+            ->get();
+
+        if ($names->isEmpty()) {
+            return [];
+        }
+
+        $result = [];
+
+        foreach ($names as $row) {
+            $group = $this->scoped()
+                ->with('region')
+                ->where('full_name_norm', $row->full_name_norm)
+                ->when(
+                    $row->region_id === null,
+                    fn ($q) => $q->whereNull('region_id'),
+                    fn ($q) => $q->where('region_id', $row->region_id),
+                )
+                ->get();
+
+            $result[] = [
+                'nama' => $group->first()?->full_name,
+                'wilayah' => $group->first()?->region?->name,
+                'penduduk' => $group->map(fn (Resident $r): array => [
+                    'id' => $r->id,
+                    'nama' => $r->full_name,
+                    'nik' => $r->nik_masked,
+                    'lahir' => $r->birth_date->format('d-m-Y'),
+                ])->values()->all(),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Kartu keluarga yang anggotanya ada tetapi tanpa kepala keluarga (RULE-02).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function familiesWithoutHead(int $limit = 50): array
+    {
+        $familyIds = $this->scoped()
+            ->toBase()
+            ->select('family_id')
+            ->whereNotNull('family_id')
+            ->groupBy('family_id')
+            ->havingRaw("SUM(family_relation_code = 'kepala_keluarga') = 0")
+            ->limit($limit)
+            ->pluck('family_id');
+
+        if ($familyIds->isEmpty()) {
+            return [];
+        }
+
+        return $this->scoped()
+            ->with('family')
+            ->whereIn('family_id', $familyIds)
+            ->get()
+            ->groupBy('family_id')
+            ->map(fn ($group): array => [
+                'family_id' => $group->first()->family_id,
+                'nomor_kk' => $group->first()->family?->kk_number_masked,
+                'alamat' => $group->first()->family?->address,
+                'jumlah_anggota' => $group->count(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function withoutRegion(int $limit = 50): array
+    {
+        return $this->scoped()
+            ->whereNull('region_id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (Resident $r): array => [
+                'id' => $r->id,
+                'nama' => $r->full_name,
+                'nik' => $r->nik_masked,
+                'alamat' => $r->address,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function implausibleAges(int $maxAge = 110, int $limit = 50): array
+    {
+        return $this->scoped()
+            ->active()
+            ->whereDate('birth_date', '<', now()->subYears($maxAge))
+            ->limit($limit)
+            ->get()
+            ->map(fn (Resident $r): array => [
+                'id' => $r->id,
+                'nama' => $r->full_name,
+                'nik' => $r->nik_masked,
+                'lahir' => $r->birth_date->format('d-m-Y'),
+                'umur' => $r->age(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function withoutFamily(int $limit = 50): array
+    {
+        return $this->scoped()
+            ->active()
+            ->whereNull('family_id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (Resident $r): array => [
+                'id' => $r->id,
+                'nama' => $r->full_name,
+                'nik' => $r->nik_masked,
+                'umur' => $r->age(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cari penduduk berdasarkan NIK, MENGABAIKAN lingkup akses.
+     *
+     * Khusus untuk impor massal. Alasannya sama dengan nikTakenByOther():
+     * keunikan NIK berlaku se-desa. Bila impor memakai kueri ter-lingkup,
+     * seorang Kepala Dusun yang mengimpor akan membuat duplikat untuk setiap
+     * warga di luar dusunnya.
+     *
+     * Impor massal sendiri hanya dapat dijalankan pemegang izin
+     * `penduduk.impor` — pada matriks RBAC, hanya Admin Desa.
+     */
+    public function findByNikIgnoringScope(string $nik): ?Resident
+    {
+        $hash = app(PiiCipher::class)->hash(Nik::normalize($nik));
+
+        return Resident::query()->where('nik_hash', $hash)->first();
+    }
+
+    /**
+     * Buat penduduk dari baris impor.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function createFromImport(string $nik, array $attributes): Resident
+    {
+        $resident = new Resident;
+        $resident->setNik($nik);
+        $resident->fill($attributes);
+        $resident->status = Resident::STATUS_ACTIVE;
+        $resident->save();
+
+        return $resident;
+    }
+
+    /**
+     * Subkueri berisi ID penduduk yang BOLEH dilihat pengguna.
+     *
+     * Dipakai modul lain (mis. mutasi) yang menyimpan `resident_id` dan karena
+     * itu harus mengikuti pembatasan wilayah/keluarga yang sama. Mengembalikan
+     * subkueri, bukan daftar ID, agar tidak memuat ribuan ID ke memori.
+     *
+     * @return Builder<Resident>
+     */
+    public function visibleIdsQuery(): Builder
+    {
+        return $this->scoped()->select('id');
+    }
+
+    /**
+     * Agregat demografi untuk tabel ringkasan statistik — FR-PDK-15, ADR-007.
+     *
+     * Sengaja MENGABAIKAN lingkup akses, dan itu aman: yang dikembalikan hanya
+     * kombinasi dimensi beserta JUMLAHNYA — tidak ada satu pun baris penduduk,
+     * nama, maupun NIK. Penyamaran sel kecil (ADR-008) dilakukan saat
+     * penyajian, bukan di sini, agar laporan internal tetap akurat.
+     *
+     * Hanya penduduk AKTIF yang dihitung (RULE-03).
+     *
+     * @return list<array{
+     *     region_id: string|null, gender: string, age_group: string,
+     *     religion_code: string|null, education_code: string|null,
+     *     occupation_code: string|null, marital_status_code: string|null,
+     *     total: int
+     * }>
+     */
+    public function demographicAggregates(): array
+    {
+        $rows = Resident::query()
+            ->toBase()
+            ->selectRaw(<<<'SQL'
+                region_id,
+                gender,
+                CASE
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) < 5  THEN '0-4'
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) < 15 THEN '5-14'
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) < 25 THEN '15-24'
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) < 45 THEN '25-44'
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) < 65 THEN '45-64'
+                    ELSE '65+'
+                END AS age_group,
+                religion_code, education_code, occupation_code, marital_status_code,
+                COUNT(*) AS total
+            SQL)
+            ->whereNull('deleted_at')
+            ->where('status', Resident::STATUS_ACTIVE)
+            ->groupBy(
+                'region_id', 'gender', 'age_group',
+                'religion_code', 'education_code', 'occupation_code', 'marital_status_code',
+            )
+            ->get();
+
+        return $rows->map(fn (object $row): array => [
+            'region_id' => $row->region_id === null ? null : (string) $row->region_id,
+            'gender' => (string) $row->gender,
+            'age_group' => (string) $row->age_group,
+            'religion_code' => $row->religion_code === null ? null : (string) $row->religion_code,
+            'education_code' => $row->education_code === null ? null : (string) $row->education_code,
+            'occupation_code' => $row->occupation_code === null ? null : (string) $row->occupation_code,
+            'marital_status_code' => $row->marital_status_code === null
+                ? null : (string) $row->marital_status_code,
+            'total' => (int) $row->total,
+        ])->values()->all();
+    }
+
     public function countInRegionIgnoringScope(string $regionId): int
     {
         /*

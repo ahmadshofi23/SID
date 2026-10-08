@@ -33,6 +33,7 @@ final class PermissionSeeder extends Seeder
             'mutasi.lihat' => 'Melihat mutasi penduduk',
             'mutasi.tambah' => 'Mencatat mutasi penduduk',
             'mutasi.ubah' => 'Mengubah mutasi penduduk',
+            'statistik.lihat' => 'Melihat statistik kependudukan',
             'wilayah.lihat' => 'Melihat data wilayah',
             'wilayah.kelola' => 'Mengelola wilayah (dusun/RW/RT)',
         ],

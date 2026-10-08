@@ -2,7 +2,8 @@
 import { ref, computed } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
 import {
-    LayoutDashboard, Users, House, Map, ScrollText,
+    LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
+    ChartColumn, ShieldAlert, Upload,
     Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
@@ -48,8 +49,21 @@ const groups = computed<NavGroup[]>(() => [
               pattern: '/kependudukan/penduduk', icon: Users, show: can('penduduk.lihat') },
             { label: 'Kartu Keluarga', route: '/kependudukan/keluarga',
               pattern: '/kependudukan/keluarga', icon: House, show: can('keluarga.lihat') },
+            { label: 'Mutasi Penduduk', route: '/kependudukan/mutasi',
+              pattern: '/kependudukan/mutasi', icon: ArrowRightLeft, show: can('mutasi.lihat') },
+            { label: 'Statistik', route: '/kependudukan/statistik',
+              pattern: '/kependudukan/statistik', icon: ChartColumn, show: can('penduduk.lihat') },
             { label: 'Wilayah', route: '/kependudukan/wilayah',
               pattern: '/kependudukan/wilayah', icon: Map, show: can('wilayah.lihat') },
+        ],
+    },
+    {
+        label: 'Kualitas Data',
+        items: [
+            { label: 'Anomali Data', route: '/kependudukan/anomali',
+              pattern: '/kependudukan/anomali', icon: ShieldAlert, show: can('penduduk.lihat') },
+            { label: 'Impor Data', route: '/kependudukan/impor',
+              pattern: '/kependudukan/impor', icon: Upload, show: can('penduduk.impor') },
         ],
     },
     {

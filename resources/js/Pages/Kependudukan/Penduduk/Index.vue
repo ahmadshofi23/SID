@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import { Users, Plus, Search, FilterX } from '@lucide/vue'
+import { Users, Plus, Search, FilterX, Download } from '@lucide/vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppButton from '@/Components/AppButton.vue'
 import SelectField from '@/Components/SelectField.vue'
@@ -59,6 +59,20 @@ function reset(): void {
 const hasFilter = () =>
     Boolean(search.value || regionId.value || gender.value || status.value)
 
+/* Ekspor mengikuti saringan yang sedang aktif — petugas yang menyaring satu
+   dusun mengharapkan berkasnya berisi dusun itu saja, bukan seluruh desa. */
+function exportUrl(): string {
+    const params = new URLSearchParams()
+
+    if (regionId.value) params.set('region_id', regionId.value)
+    if (gender.value) params.set('gender', gender.value)
+    if (status.value) params.set('status', status.value)
+
+    const query = params.toString()
+
+    return `/kependudukan/penduduk-ekspor${query ? `?${query}` : ''}`
+}
+
 const aktif = () => props.statusCounts.aktif ?? 0
 const total = () => Object.values(props.statusCounts).reduce((a, b) => a + b, 0)
 </script>
@@ -78,10 +92,17 @@ const total = () => Object.values(props.statusCounts).reduce((a, b) => a + b, 0)
                 </p>
             </div>
 
-            <AppButton v-if="can('penduduk.tambah')" href="/kependudukan/penduduk/tambah" variant="primary">
-                <Plus class="size-4" aria-hidden="true" />
-                Tambah Penduduk
-            </AppButton>
+            <div class="flex flex-wrap gap-2">
+                <AppButton v-if="can('penduduk.ekspor')" :href="exportUrl()">
+                    <Download class="size-4" aria-hidden="true" />
+                    Ekspor CSV
+                </AppButton>
+                <AppButton v-if="can('penduduk.tambah')"
+                           href="/kependudukan/penduduk/tambah" variant="primary">
+                    <Plus class="size-4" aria-hidden="true" />
+                    Tambah Penduduk
+                </AppButton>
+            </div>
         </header>
 
         <!-- Saringan -->
