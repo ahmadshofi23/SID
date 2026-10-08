@@ -17,15 +17,38 @@ make serve      # http://localhost:8000 (PHP + Vite + queue worker)
 
 Akun contoh (hanya di lingkungan lokal) — kata sandi `kata-sandi-demo-2026`:
 
-| Email | Peran | Berguna untuk menguji |
-|-------|-------|------------------------|
-| `admin@sukamaju.desa.id` | Admin Desa | Pemaksaan 2FA, akses penuh |
-| `kades@sukamaju.desa.id` | Kepala Desa | Pemaksaan 2FA, hak persetujuan |
-| `operator@sukamaju.desa.id` | Operator | Tanpa hak hapus & setujui (RULE-06) |
-| `kadus.krajan@sukamaju.desa.id` | Kepala Dusun | **Pembatasan wilayah** |
-| `kadus.sido@sukamaju.desa.id` | Kepala Dusun | Pembatasan wilayah (dusun lain) |
-| `warga@sukamaju.desa.id` | Warga | **Pembatasan keluarga** (RULE-11) |
-| `bpd@sukamaju.desa.id` | Pengawas | Read-only |
+| Email | Peran | 2FA | Menu yang terlihat |
+|-------|-------|-----|--------------------|
+| `admin@sukamaju.desa.id` | Admin Desa | **wajib** | Semua, termasuk **Impor** & tombol buka NIK |
+| `kades@sukamaju.desa.id` | Kepala Desa | **wajib** | Semua kecuali impor & kelola pengguna |
+| `kasi.pem@sukamaju.desa.id` | Kasi Pemerintahan | — | Kependudukan, mutasi, statistik |
+| `operator@sukamaju.desa.id` | Operator | — | Kependudukan (tanpa impor, hapus, buka NIK) |
+| `kadus.krajan@sukamaju.desa.id` | Kepala Dusun | — | **Hanya Dusun Krajan** |
+| `kadus.sido@sukamaju.desa.id` | Kepala Dusun | — | **Hanya Dusun Sidomulyo** |
+| `bpd@sukamaju.desa.id` | Pengawas | — | Read-only + ekspor |
+| `warga@sukamaju.desa.id` | Warga | — | **Hanya anggota KK-nya** |
+
+### Masuk sebagai Admin Desa (2FA wajib)
+
+Impor massal, pembukaan NIK penuh, dan pengelolaan pengguna **hanya dimiliki
+Admin Desa** — dan peran itu wajib verifikasi dua langkah (FR-AUT-05). Tanpa
+jalan keluar, seluruh fitur tersebut tidak dapat dicoba saat pengembangan.
+
+```bash
+php artisan sid:totp admin@sukamaju.desa.id
+```
+
+Perintah menampilkan kode 6 angka yang sedang berlaku. Ia **hanya bekerja di
+lingkungan lokal** — di produksi, 2FA tidak boleh dapat dilewati dari shell.
+
+Ingin memakai aplikasi autentikator sungguhan? Perintah yang sama juga
+menampilkan rahasia yang dapat dimasukkan manual ke Google Authenticator/Aegis.
+
+### Di mana fitur impor?
+
+Dua tempat, keduanya hanya muncul bagi pemegang izin `penduduk.impor`:
+- **Data Penduduk → tombol "Impor dari Excel"** (tempat orang mencarinya)
+- **Menu samping → Kelola Data → Impor dari Excel**
 
 > ⚠ Untuk pemasangan nyata, **jangan** jalankan `DemoDataSeeder`. Buat akun
 > administrator pertama dengan `php artisan sid:create-admin` — tidak ada kata

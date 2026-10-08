@@ -58,12 +58,14 @@ const groups = computed<NavGroup[]>(() => [
         ],
     },
     {
-        label: 'Kualitas Data',
+        // "Kelola Data", bukan "Kualitas Data": petugas yang mencari fitur
+        // impor tidak akan menebak bahwa ia ada di bawah "kualitas".
+        label: 'Kelola Data',
         items: [
-            { label: 'Anomali Data', route: '/kependudukan/anomali',
-              pattern: '/kependudukan/anomali', icon: ShieldAlert, show: can('penduduk.lihat') },
-            { label: 'Impor Data', route: '/kependudukan/impor',
+            { label: 'Impor dari Excel', route: '/kependudukan/impor',
               pattern: '/kependudukan/impor', icon: Upload, show: can('penduduk.impor') },
+            { label: 'Periksa Anomali', route: '/kependudukan/anomali',
+              pattern: '/kependudukan/anomali', icon: ShieldAlert, show: can('penduduk.lihat') },
         ],
     },
     {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import { Users, Plus, Search, FilterX, Download } from '@lucide/vue'
+import { Users, Plus, Search, FilterX, Download, Upload } from '@lucide/vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppButton from '@/Components/AppButton.vue'
 import SelectField from '@/Components/SelectField.vue'
@@ -93,6 +93,13 @@ const total = () => Object.values(props.statusCounts).reduce((a, b) => a + b, 0)
             </div>
 
             <div class="flex flex-wrap gap-2">
+                <!-- Impor ditempatkan di sini, bukan hanya di menu samping:
+                     petugas yang ingin memasukkan banyak data mencarinya di
+                     halaman data penduduk, bukan di grup menu lain. -->
+                <AppButton v-if="can('penduduk.impor')" href="/kependudukan/impor">
+                    <Upload class="size-4" aria-hidden="true" />
+                    Impor dari Excel
+                </AppButton>
                 <AppButton v-if="can('penduduk.ekspor')" :href="exportUrl()">
                     <Download class="size-4" aria-hidden="true" />
                     Ekspor CSV
@@ -156,17 +163,22 @@ const total = () => Object.values(props.statusCounts).reduce((a, b) => a + b, 0)
             :title="hasFilter() ? 'Tidak ada data yang cocok' : 'Belum ada data penduduk'"
             :description="hasFilter()
                 ? 'Coba ubah kata kunci atau hapus sebagian saringan.'
-                : 'Mulai dengan menambahkan penduduk pertama, atau impor dari Excel (Sprint 3).'"
+                : 'Cara tercepat mengisi data pertama kali adalah impor dari Excel. Anda juga dapat menambahkannya satu per satu.'"
         >
             <AppButton v-if="hasFilter()" variant="secondary" @click="reset">Hapus saringan</AppButton>
-            <AppButton
-                v-else-if="can('penduduk.tambah')"
-                href="/kependudukan/penduduk/tambah"
-                variant="primary"
-            >
-                <Plus class="size-4" aria-hidden="true" />
-                Tambah Penduduk
-            </AppButton>
+            <template v-else>
+                <AppButton v-if="can('penduduk.impor')"
+                           href="/kependudukan/impor" variant="primary">
+                    <Upload class="size-4" aria-hidden="true" />
+                    Impor dari Excel
+                </AppButton>
+                <AppButton v-if="can('penduduk.tambah')"
+                           href="/kependudukan/penduduk/tambah"
+                           :variant="can('penduduk.impor') ? 'secondary' : 'primary'">
+                    <Plus class="size-4" aria-hidden="true" />
+                    Tambah Satu per Satu
+                </AppButton>
+            </template>
         </EmptyState>
 
         <template v-else>
