@@ -21,18 +21,7 @@ final class SecurityHeaders
     {
         $response = $next($request);
 
-        $csp = implode('; ', [
-            "default-src 'self'",
-            "img-src 'self' data: blob:",
-            "style-src 'self' 'unsafe-inline'",
-            "script-src 'self'",
-            "font-src 'self'",
-            "connect-src 'self'",
-            "object-src 'none'",
-            "frame-ancestors 'none'",
-            "base-uri 'self'",
-            "form-action 'self'",
-        ]);
+        $csp = implode('; ', $this->contentSecurityPolicy());
 
         $headers = [
             'Content-Security-Policy' => $csp,
@@ -52,5 +41,42 @@ final class SecurityHeaders
         }
 
         return $response;
+    }
+
+    /**
+     * Content Security Policy.
+     *
+     * Produksi memakai kebijakan ketat. Saat pengembangan, server Vite berjalan
+     * di porta terpisah dan memuat modul serta WebSocket dari sana — tanpa
+     * pelonggaran ini, panel tidak dapat dimuat sama sekali saat `npm run dev`.
+     *
+     * Pelonggaran DIBATASI pada lingkungan lokal. Bila APP_ENV bukan `local`,
+     * kebijakan ketat berlaku penuh, termasuk di staging — sehingga pelanggaran
+     * CSP tertangkap sebelum produksi, bukan sesudahnya.
+     *
+     * @return list<string>
+     */
+    private function contentSecurityPolicy(): array
+    {
+        $policy = [
+            "default-src 'self'",
+            "img-src 'self' data: blob:",
+            "style-src 'self' 'unsafe-inline'",
+            "font-src 'self' data:",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+        ];
+
+        if (app()->environment('local')) {
+            return [
+                ...$policy,
+                "script-src 'self' 'unsafe-eval' http://localhost:5173 http://127.0.0.1:5173",
+                "connect-src 'self' ws://localhost:5173 ws://127.0.0.1:5173 http://localhost:5173 http://127.0.0.1:5173",
+            ];
+        }
+
+        return [...$policy, "script-src 'self'", "connect-src 'self'"];
     }
 }

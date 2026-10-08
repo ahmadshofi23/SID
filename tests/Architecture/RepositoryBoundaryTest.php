@@ -140,6 +140,66 @@ final class RepositoryBoundaryTest extends TestCase
         )));
     }
 
+    #[Test]
+    public function controller_tidak_menyuntik_dependensi_berlingkup_lewat_konstruktor(): void
+    {
+        /*
+         * MENGAPA UJI INI ADA — ini bug nyata, bukan kehati-hatian berlebihan.
+         *
+         * Illuminate\Routing\Route::getController() MENYIMPAN instance
+         * controller pada objek Route, dan objek Route hidup selama proses
+         * berjalan. Dependensi yang di-inject lewat konstruktor karena itu
+         * hanya dibuat SEKALI per proses.
+         *
+         * Untuk repository/service yang membawa AccessScope, akibatnya:
+         * lingkup akses pengguna PERTAMA ikut terpakai oleh pengguna
+         * berikutnya. Di PHP-FPM tidak terlihat (satu proses satu permintaan);
+         * di Laravel Octane pasti terjadi, dan berupa kebocoran data pribadi
+         * antar-pengguna.
+         *
+         * Ditemukan pada Sprint 2 ketika tiga peran berbeda, diminta berurutan,
+         * mengembalikan daftar penduduk yang sama persis.
+         *
+         * Solusinya: inject per METODE. Laravel menyelesaikan parameter metode
+         * pada setiap dispatch.
+         */
+        $scopedTypes = [
+            'ResidentRepository', 'FamilyRepository',
+            'ResidentService', 'FamilyService', 'RegionService',
+            'AccessScope',
+        ];
+
+        $violations = [];
+
+        foreach ($this->phpFilesIn('app/Http/Controllers') as $file) {
+            $contents = (string) file_get_contents($file->getPathname());
+
+            if (! preg_match('/function\s+__construct\s*\((.*?)\)\s*[{:]/s', $contents, $m)) {
+                continue;
+            }
+
+            foreach ($scopedTypes as $type) {
+                if (str_contains($m[1], $type)) {
+                    $violations[] = sprintf(
+                        '%s — %s di-inject lewat konstruktor',
+                        $this->relativePath($file), $type
+                    );
+                }
+            }
+        }
+
+        $this->assertSame([], $violations, implode("\n", array_merge(
+            ['Dependensi ber-lingkup akses di-inject lewat konstruktor controller:', ''],
+            array_map(fn ($v) => '  - '.$v, $violations),
+            [
+                '',
+                'Route menyimpan instance controller selama proses hidup, sehingga',
+                'dependensi ini hanya dibuat SEKALI — membawa lingkup akses pengguna',
+                'pertama ke pengguna berikutnya. Pindahkan ke parameter METODE.',
+            ]
+        )));
+    }
+
     /** @return list<SplFileInfo> */
     private function phpFilesIn(string $relativeDir): array
     {

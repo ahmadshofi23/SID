@@ -30,3 +30,6 @@ Thumbs.db
 /.claude/
 .phpunit.cache
 coverage.xml
+
+# Aset hasil build Vite — dibangun ulang tiap rilis (npm run build)
+/public/build

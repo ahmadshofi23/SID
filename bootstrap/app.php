@@ -6,6 +6,7 @@ use App\Http\Middleware\AssignCorrelationId;
 use App\Http\Middleware\EnforceSessionPolicy;
 use App\Http\Middleware\EnforceTwoFactor;
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
 use App\Providers\SidServiceProvider;
 use Illuminate\Foundation\Application;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             EnforceSessionPolicy::class,
             EnforceTwoFactor::class,
+            HandleInertiaRequests::class,
         ]);
 
         $middleware->alias([

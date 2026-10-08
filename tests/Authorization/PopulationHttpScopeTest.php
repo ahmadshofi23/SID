@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Support\NameNormalizer;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\TestDox;
 use Tests\TestCase;
@@ -79,15 +80,23 @@ final class PopulationHttpScopeTest extends TestCase
     }
 
     #[Test]
-    #[TestDox('Daftar penduduk Kadus tidak memuat nama warga dusun lain')]
+    #[TestDox('Daftar penduduk Kadus tidak memuat warga dusun lain')]
     public function daftar_penduduk_tidak_bocor(): void
     {
         $response = $this->actingAs($this->userWithRole(Role::KEPALA_DUSUN, $this->dusunKrajan))
             ->get('/kependudukan/penduduk');
 
         $response->assertOk();
-        $response->assertSee('Warga Krajan Satu');
-        $response->assertDontSee('Warga Sidomulyo Satu');
+        $response->assertInertia(function (AssertableInertia $page): void {
+            $names = collect($page->toArray()['props']['residents']['data'])
+                ->pluck('full_name');
+
+            $this->assertTrue($names->contains('Warga Krajan Satu'));
+            $this->assertFalse(
+                $names->contains('Warga Sidomulyo Satu'),
+                'KEBOCORAN DATA: daftar memuat penduduk dusun lain.'
+            );
+        });
     }
 
     #[Test]
@@ -223,15 +232,36 @@ final class PopulationHttpScopeTest extends TestCase
     }
 
     #[Test]
-    #[TestDox('Halaman detail tidak memuat NIK penuh di dalam HTML')]
-    public function html_tidak_memuat_nik_penuh(): void
+    #[TestDox('Data halaman tidak memuat NIK penuh — hanya bentuk ter-masking')]
+    public function data_halaman_tidak_memuat_nik_penuh(): void
     {
         $response = $this->actingAs($this->userWithRole(Role::ADMIN_DESA))
             ->get("/kependudukan/penduduk/{$this->wargaKrajan->id}");
 
         $response->assertOk();
-        $response->assertSee('3201••••••••0101');
-        $response->assertDontSee('3201010101800101');
+
+        /*
+         * Diperiksa pada PROPS Inertia, bukan pada HTML mentah.
+         *
+         * Inilah yang sebenarnya dikirim ke peramban dan dapat dibaca siapa pun
+         * lewat "view source" atau alat pengembang. Bila NIK penuh lolos ke
+         * sini, seluruh perlindungan RULE-07 menjadi sia-sia — tombol "lihat"
+         * yang tercatat di audit log tidak ada artinya kalau nilainya sudah ada
+         * di halaman sejak awal.
+         */
+        $response->assertInertia(
+            fn (AssertableInertia $page) => $page
+                ->component('Kependudukan/Penduduk/Show')
+                ->where('resident.nik_masked', '3201••••••••0101')
+                ->missing('resident.nik')
+                ->missing('resident.nik_enc')
+        );
+
+        $this->assertStringNotContainsString(
+            '3201010101800101',
+            (string) $response->getContent(),
+            'NIK penuh ikut terkirim ke peramban.'
+        );
     }
 
     #[Test]
@@ -241,6 +271,53 @@ final class PopulationHttpScopeTest extends TestCase
         $this->actingAs($this->userWithRole(Role::ADMIN_DESA))
             ->get('/kependudukan/penduduk/018f0000-0000-7000-8000-000000000000')
             ->assertNotFound();
+    }
+
+    #[Test]
+    #[TestDox('REGRESI: permintaan berurutan oleh peran berbeda tidak berbagi lingkup akses')]
+    public function lingkup_tidak_bocor_antar_permintaan_berurutan(): void
+    {
+        /*
+         * REGRESI Sprint 2 — lihat tests/Architecture (konstruktor controller).
+         *
+         * Bug aslinya: instance controller tersimpan pada objek Route selama
+         * proses hidup, sehingga repository beserta AccessScope-nya hanya
+         * dibuat sekali. Permintaan kedua dan seterusnya memakai lingkup akses
+         * pengguna pertama.
+         *
+         * Uji ini menirukan satu proses yang melayani beberapa pengguna
+         * berturut-turut — persis yang terjadi pada Laravel Octane.
+         */
+        $kadus = $this->userWithRole(Role::KEPALA_DUSUN, $this->dusunKrajan);
+        $admin = $this->userWithRole(Role::ADMIN_DESA);
+
+        $namesFor = function ($user): array {
+            $names = [];
+
+            $this->actingAs($user)->get('/kependudukan/penduduk')
+                ->assertInertia(function (AssertableInertia $page) use (&$names): void {
+                    $names = collect($page->toArray()['props']['residents']['data'])
+                        ->pluck('full_name')->sort()->values()->all();
+                });
+
+            return $names;
+        };
+
+        // Kadus LEBIH DULU: bila lingkup melekat, Admin akan ikut terbatas.
+        $kadusNames = $namesFor($kadus);
+        $adminNames = $namesFor($admin);
+
+        $this->assertNotContains('Warga Sidomulyo Satu', $kadusNames);
+        $this->assertContains(
+            'Warga Sidomulyo Satu',
+            $adminNames,
+            'KEBOCORAN LINGKUP: Admin Desa ikut terbatas pada wilayah Kepala Dusun '
+            .'yang mengakses sebelumnya. Dependensi ber-lingkup kemungkinan '
+            .'di-inject lewat konstruktor controller.'
+        );
+
+        // Arah sebaliknya juga harus benar.
+        $this->assertNotContains('Warga Sidomulyo Satu', $namesFor($kadus));
     }
 
     private function firstRt(Region $dusun): Region

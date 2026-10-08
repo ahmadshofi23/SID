@@ -3,8 +3,8 @@
 **Status:** Sprint 2 (Kependudukan) **selesai** — lihat [laporan Sprint 2](docs/15-laporan-sprint-2.md).
 
 ```bash
-make setup && make serve     # http://localhost:8000
-make check                   # pint + phpstan + 132 uji (sama dengan CI)
+make setup && make serve     # http://localhost:8000 (termasuk npm ci && npm run build)
+make check                   # pint + phpstan + 134 uji (sama dengan CI)
 ```
 
 Panduan pengembangan: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -24,10 +24,12 @@ siap dipakai sebagai dasar kontrak kerja, estimasi, dan implementasi.
 | KEP-001 | **Lingkup** | **Satu desa** (single-tenant) — tanpa `tenant_id`, tanpa multi-tenancy |
 | KEP-002 | **Basis data** | **MySQL 8.0** (InnoDB, utf8mb4) |
 | KEP-003 | **Jenis surat** | **Katalog umum 22 jenis** — 8 aktif saat pemasangan, 14 siap diaktifkan |
-| KEP-004 | **Stack** | **Laravel 13** + MySQL 8 + Redis + Gotenberg |
-| KEP-005 | **Panel admin** | **Blade + CSS token** (bukan Inertia/React) — reversibel, lihat KEP-005 |
+| KEP-004 | **Stack** | **Laravel 13** + MySQL 8 + Redis + Gotenberg + **Node/Vite** (KEP-008) |
+| KEP-005 | ~~Panel admin Blade~~ | Digantikan KEP-008 |
 | KEP-006 | **Cadangan kunci data pribadi** | Dicetak di kertas, dua pemegang, dua lokasi — [prosedurnya](ops/runbook/pencadangan-kunci.md) |
-| KEP-007 | **Kerangka kerja JS (bila perlu)** | **Vue**, hanya sebagai *island* di layar yang menuntut — diputuskan Sprint 4 |
+| KEP-007 | ~~Vue sebagai *island*~~ | Dilampaui KEP-008 |
+| KEP-008 | **Panel admin** | **Vue 3 + Inertia + TypeScript + Tailwind v4** (portal publik tetap Blade SSR) |
+| KEP-009 | **Dependensi ber-lingkup akses** | Hanya lewat injeksi metode — konstruktor controller dilarang (keamanan) |
 
 Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log Keputusan](docs/00-log-keputusan.md)**.
 

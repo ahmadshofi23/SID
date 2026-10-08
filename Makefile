@@ -1,6 +1,6 @@
 # Sistem Informasi Desa — perintah pengembangan
 .DEFAULT_GOAL := help
-.PHONY: help setup serve test test-wajib lint analyse check fresh seed harden
+.PHONY: help setup serve build test test-wajib lint analyse check fresh seed harden
 
 help: ## Tampilkan daftar perintah
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -8,14 +8,20 @@ help: ## Tampilkan daftar perintah
 
 setup: ## Pasang dependensi & siapkan basis data pengembangan
 	composer install
+	npm ci
 	@test -f .env || cp .env.example .env
 	php artisan key:generate
 	@echo "Isi PII_ENCRYPTION_KEY & PII_HASH_PEPPER di .env:"
 	php artisan sid:generate-pii-keys
 	php artisan migrate --seed
+	npm run build
 
-serve: ## Jalankan server pengembangan
-	php artisan serve --host=127.0.0.1 --port=8000
+serve: ## Jalankan server pengembangan (PHP + Vite)
+	npx concurrently -k -n php,vite -c green,magenta \
+		"php artisan serve --host=127.0.0.1 --port=8000" "npm run dev"
+
+build: ## Bangun aset produksi
+	npm run build
 
 fresh: ## Bangun ulang basis data + data contoh
 	php artisan migrate:fresh --seed
@@ -29,8 +35,9 @@ test-wajib: ## Jalankan HANYA lapis wajib (batas repository + otorisasi)
 lint: ## Rapikan format kode
 	./vendor/bin/pint
 
-analyse: ## Analisis statis (PHPStan level 6)
+analyse: ## Analisis statis (PHPStan level 6 + TypeScript)
 	./vendor/bin/phpstan analyse --memory-limit=1G
+	npx vue-tsc --noEmit
 
 check: lint analyse test ## Jalankan seluruh gerbang kualitas (sama dengan CI)
 

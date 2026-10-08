@@ -1,9 +1,246 @@
 @import 'tailwindcss';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+/*
+ * Inter dimuat LOKAL, bukan dari CDN pihak ketiga (docs/07-ui-ux.md §3.2).
+ * Alasannya tiga: tidak membocorkan alamat IP warga ke server font asing,
+ * tidak menambah satu permintaan DNS di jaringan desa yang lambat, dan tetap
+ * berfungsi bila CDN diblokir atau tidak dapat dijangkau.
+ */
+@import '@fontsource-variable/inter/index.css';
+
+/* ============================================================================
+   Sistem Informasi Desa — Design System
+   Gaya: Data-Dense Dashboard (padat informasi, tetap mudah dipindai)
+   Acuan: docs/07-ui-ux.md §3 · WCAG 2.1 AA
+
+   Dua hal yang memandu setiap keputusan di berkas ini:
+   1. Penggunanya perangkat desa berusia 45+ dengan literasi digital rendah.
+      Maka: teks dasar 16px, target sentuh 44px, kontras di atas ambang minimum.
+   2. Ini situs pemerintahan, bukan produk komersial. Maka: tenang, rapi,
+      tanpa gradien mencolok atau animasi yang menarik perhatian ke dirinya sendiri.
+   ========================================================================== */
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    /* --- Warna merek ----------------------------------------------------- */
+    --color-brand-50:  #ECF5F0;
+    --color-brand-100: #D4E9DD;
+    --color-brand-200: #A9D3BB;
+    --color-brand-300: #7BBB97;
+    --color-brand-400: #4E9F73;
+    --color-brand-500: #2E7D52;
+    --color-brand-600: #1B5E3F;   /* warna utama desa */
+    --color-brand-700: #174F35;
+    --color-brand-800: #123D29;
+    --color-brand-900: #0C2A1D;
+
+    --color-gold-400: #D9A520;
+    --color-gold-500: #B8860B;    /* aksen resmi */
+    --color-gold-600: #946C09;
+
+    /* --- Tipografi -------------------------------------------------------
+       Inter dipilih di atas rekomendasi umum (Fira Sans) karena punya angka
+       tabular dan bentuk huruf yang sangat jelas pada ukuran kecil — penting
+       untuk tabel NIK dan untuk pengguna berusia 45+.                      */
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* --- Radius & bayangan ----------------------------------------------
+       Bayangan sengaja tipis. Elevasi berlebihan membuat tampilan terasa
+       seperti aplikasi konsumen, bukan layanan pemerintah.                 */
+    --radius-card: 0.75rem;
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+    --shadow-raised: 0 4px 6px -1px rgb(16 24 40 / 0.07), 0 2px 4px -2px rgb(16 24 40 / 0.05);
+    --shadow-overlay: 0 20px 25px -5px rgb(16 24 40 / 0.12), 0 8px 10px -6px rgb(16 24 40 / 0.08);
+
+    /* --- Gerak ----------------------------------------------------------
+       150–250ms: cukup terasa sebagai umpan balik, tidak memperlambat kerja. */
+    --ease-out-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Token semantik: mode terang ---------------------------------------- */
+:root {
+    --surface:           255 255 255;
+    --surface-raised:    255 255 255;
+    --surface-sunken:    248 250 249;
+    --surface-hover:     244 247 245;
+    --background:        247 249 248;
+
+    --text-primary:       17  24  39;
+    --text-secondary:     71  85 105;
+    --text-tertiary:     107 114 128;
+    --text-inverse:      255 255 255;
+
+    --border-default:    226 232 237;
+    --border-strong:     203 213 219;
+
+    /*
+     * Garis tepi KONTROL (input, select, tombol) dipisahkan dari garis
+     * dekoratif (pemisah baris tabel).
+     *
+     * WCAG 1.4.11 menuntut kontras 3:1 untuk batas yang diperlukan guna
+     * MENGENALI sebuah kontrol — tetapi tidak untuk pemisah dekoratif.
+     * Memakai satu nilai untuk keduanya memaksa memilih antara tabel yang
+     * ramai atau input yang tak terlihat. Dipisahkan, keduanya benar.
+     */
+    --border-control:    148 163 178;
+
+    --accent:             27  94  63;   /* brand-600 */
+    --accent-hover:       23  79  53;
+    --accent-soft:       236 245 240;
+    --accent-text:        18  61  41;
+
+    --success:            21 128  61;
+    --success-soft:      236 253 243;
+    --warning:           180  83   9;
+    --warning-soft:      255 247 237;
+    --danger:            185  28  28;
+    --danger-soft:       254 242 242;
+    --info:               29  78 216;
+    --info-soft:         239 246 255;
+
+    --ring:               27  94  63;
+    color-scheme: light;
+}
+
+/* --- Token semantik: mode gelap -----------------------------------------
+   Bukan pembalikan warna terang. Permukaan dibuat abu kebiruan hangat dan
+   warna merek dinaikkan kecerahannya, karena hijau tua #1B5E3F tidak cukup
+   kontras di atas latar gelap (WCAG: color-dark-mode).                     */
+.dark {
+    --surface:            25  31  38;
+    --surface-raised:     31  39  47;
+    --surface-sunken:     17  22  28;
+    --surface-hover:      38  47  56;
+    --background:         15  19  24;
+
+    --text-primary:      241 245 249;
+    --text-secondary:    168 180 194;
+    --text-tertiary:     132 145 160;
+    --text-inverse:       15  19  24;
+
+    --border-default:     45  55  66;
+    --border-strong:      62  74  87;
+    --border-control:     94 106 121;   /* ≈ 2.9:1 terhadap permukaan gelap */
+
+    --accent:            110 190 148;   /* dinaikkan agar kontras ≥ 4.5:1 */
+    --accent-hover:      139 206 170;
+    --accent-soft:        22  48  36;
+    --accent-text:       167 211 188;
+
+    --success:           110 200 150;
+    --success-soft:       20  48  34;
+    --warning:           229 170  85;
+    --warning-soft:       59  41  17;
+    --danger:            248 150 150;
+    --danger-soft:        62  26  26;
+    --info:              147 178 255;
+    --info-soft:          25  38  70;
+
+    --ring:              110 190 148;
+    color-scheme: dark;
+}
+
+@theme inline {
+    --color-surface:        rgb(var(--surface));
+    --color-surface-raised: rgb(var(--surface-raised));
+    --color-surface-sunken: rgb(var(--surface-sunken));
+    --color-surface-hover:  rgb(var(--surface-hover));
+    --color-background:     rgb(var(--background));
+
+    --color-content:           rgb(var(--text-primary));
+    --color-content-secondary: rgb(var(--text-secondary));
+    --color-content-tertiary:  rgb(var(--text-tertiary));
+    --color-content-inverse:   rgb(var(--text-inverse));
+
+    --color-line:         rgb(var(--border-default));
+    --color-line-strong:  rgb(var(--border-strong));
+    --color-line-control: rgb(var(--border-control));
+
+    --color-accent:      rgb(var(--accent));
+    --color-accent-hover: rgb(var(--accent-hover));
+    --color-accent-soft: rgb(var(--accent-soft));
+    --color-accent-text: rgb(var(--accent-text));
+
+    --color-success:      rgb(var(--success));
+    --color-success-soft: rgb(var(--success-soft));
+    --color-warning:      rgb(var(--warning));
+    --color-warning-soft: rgb(var(--warning-soft));
+    --color-danger:       rgb(var(--danger));
+    --color-danger-soft:  rgb(var(--danger-soft));
+    --color-info:         rgb(var(--info));
+    --color-info-soft:    rgb(var(--info-soft));
+}
+
+/* --- Dasar --------------------------------------------------------------- */
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        background-color: var(--color-background);
+        color: var(--color-content);
+        font-family: var(--font-sans);
+        font-size: 1rem;            /* 16px — jangan diperkecil */
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    /* Angka tabular agar kolom data tidak bergeser saat nilainya berubah */
+    .tabular, table td, table th { font-variant-numeric: tabular-nums; }
+
+    /* Fokus terlihat jelas — jangan pernah dihapus (WCAG focus-states) */
+    :focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+        border-radius: 0.375rem;
+    }
+
+    ::selection { background-color: var(--color-accent-soft); }
+
+    /* Hormati preferensi pengguna yang sensitif terhadap gerak */
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}
+
+@layer utilities {
+    /* Target sentuh minimum 44px (Apple HIG / WCAG) */
+    .touch-target { min-height: 2.75rem; min-width: 2.75rem; }
+
+    .card {
+        background-color: var(--color-surface);
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-card);
+    }
+
+    /* Animasi masuk halaman: satu gerakan halus, tidak mencolok */
+    .animate-rise { animation: rise 0.25s var(--ease-out-smooth) both; }
+
+    @keyframes rise {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    .skeleton {
+        background: linear-gradient(90deg,
+            var(--color-surface-hover) 25%,
+            var(--color-surface-sunken) 37%,
+            var(--color-surface-hover) 63%);
+        background-size: 400% 100%;
+        animation: shimmer 1.4s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+        from { background-position: 100% 50%; }
+        to   { background-position: 0 50%; }
+    }
 }

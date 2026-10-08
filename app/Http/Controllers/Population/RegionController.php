@@ -10,65 +10,99 @@ use App\Http\Requests\Population\UpdateRegionRequest;
 use App\Models\Region;
 use App\Services\Population\RegionService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class RegionController extends Controller
 {
-    public function __construct(private readonly RegionService $service) {}
+    /*
+     * Tanpa konstruktor — lihat penjelasan di ResidentController.
+     *
+     * RegionService sendiri bergantung pada ResidentRepository (untuk memeriksa
+     * apakah wilayah masih dihuni), sehingga ikut membawa AccessScope.
+     */
 
-    public function index(): View
+    public function index(RegionService $service): Response
     {
-        return view('kependudukan.wilayah.index', [
-            'tree' => $this->service->tree(),
+        return Inertia::render('Kependudukan/Wilayah/Index', [
+            'tree' => $service->tree()->map($this->presentRegion(...))->values()->all(),
         ]);
     }
 
-    public function create(): View
+    /**
+     * Bentuk wilayah untuk ditampilkan, beserta turunannya.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentRegion(Region $region): array
+    {
+        return [
+            'id' => $region->id,
+            'name' => $region->name,
+            'level' => $region->level,
+            'code' => $region->code,
+            'head_name' => $region->head_name,
+            'children' => $region->children->map($this->presentRegion(...))->values()->all(),
+        ];
+    }
+
+    public function create(): Response
     {
         $this->authorize('wilayah.kelola');
 
-        return view('kependudukan.wilayah.form', [
+        return Inertia::render('Kependudukan/Wilayah/Form', [
             'region' => null,
             'parents' => $this->parentOptions(),
         ]);
     }
 
-    public function store(StoreRegionRequest $request): RedirectResponse
+    public function store(StoreRegionRequest $request, RegionService $service): RedirectResponse
     {
         $this->authorize('wilayah.kelola');
 
-        $region = $this->service->create($request->validated());
+        $region = $service->create($request->validated());
 
         return redirect()->route('wilayah.index')
             ->with('status', "Wilayah {$region->name} berhasil ditambahkan.");
     }
 
-    public function edit(Region $region): View
+    public function edit(Region $region): Response
     {
         $this->authorize('wilayah.kelola');
 
-        return view('kependudukan.wilayah.form', [
-            'region' => $region,
+        return Inertia::render('Kependudukan/Wilayah/Form', [
+            'region' => [
+                'id' => $region->id,
+                'name' => $region->name,
+                'level' => $region->level,
+                'code' => $region->code,
+                'parent_id' => $region->parent_id,
+                'head_name' => $region->head_name,
+                'head_phone' => $region->head_phone,
+            ],
             'parents' => $this->parentOptions(),
         ]);
     }
 
-    public function update(UpdateRegionRequest $request, Region $region): RedirectResponse
-    {
+    public function update(
+        UpdateRegionRequest $request,
+        Region $region,
+        RegionService $service,
+    ): RedirectResponse {
         $this->authorize('wilayah.kelola');
 
-        $this->service->update($region, $request->validated());
+        $service->update($region, $request->validated());
 
         return redirect()->route('wilayah.index')
             ->with('status', 'Perubahan wilayah berhasil disimpan.');
     }
 
-    public function destroy(Region $region): RedirectResponse
+    public function destroy(Region $region, RegionService $service): RedirectResponse
     {
         $this->authorize('wilayah.kelola');
 
         $name = $region->name;
-        $this->service->delete($region);
+        $service->delete($region);
 
         return redirect()->route('wilayah.index')
             ->with('status', "Wilayah {$name} dihapus.");

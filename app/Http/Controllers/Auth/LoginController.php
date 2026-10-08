@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class LoginController extends Controller
 {
@@ -25,9 +26,9 @@ final class LoginController extends Controller
         private readonly AuditLogger $audit,
     ) {}
 
-    public function show(): View
+    public function show(): Response
     {
-        return view('auth.login');
+        return Inertia::render('Auth/Login');
     }
 
     public function store(LoginRequest $request): RedirectResponse

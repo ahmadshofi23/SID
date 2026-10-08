@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Population\FamilyController;
 use App\Http\Controllers\Population\RegionController;
 use App\Http\Controllers\Population\ResidentController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -54,7 +56,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('dua-faktor/pasang', [TwoFactorController::class, 'confirm'])
         ->name('two-factor.confirm');
 
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     /* ---------------------- Kependudukan (Sprint 2) --------------------- */
     Route::prefix('kependudukan')->group(function (): void {
@@ -116,7 +118,8 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:wilayah.kelola')->name('wilayah.destroy');
     });
 
-    Route::get('pengaturan/log-aktivitas', function () {
-        return view('placeholder', ['title' => 'Log Aktivitas', 'sprint' => 'Sprint 7']);
-    })->middleware('izin:audit.lihat')->name('audit.index');
+    Route::get('pengaturan/log-aktivitas', fn () => Inertia::render('Placeholder', [
+        'title' => 'Log Aktivitas',
+        'sprint' => 'Sprint 7',
+    ]))->middleware('izin:audit.lihat')->name('audit.index');
 });

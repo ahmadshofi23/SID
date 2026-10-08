@@ -11,7 +11,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class TwoFactorController extends Controller
 {
@@ -21,7 +22,7 @@ final class TwoFactorController extends Controller
     ) {}
 
     /** Tahap kedua login untuk akun yang sudah mengaktifkan 2FA. */
-    public function challenge(string $challenge): View|RedirectResponse
+    public function challenge(string $challenge): Response|RedirectResponse
     {
         if (! Cache::has("2fa:challenge:{$challenge}")) {
             return redirect()->route('login')->withErrors([
@@ -29,7 +30,7 @@ final class TwoFactorController extends Controller
             ]);
         }
 
-        return view('auth.two-factor-challenge', ['challenge' => $challenge]);
+        return Inertia::render('Auth/TwoFactorChallenge', ['challenge' => $challenge]);
     }
 
     public function verifyChallenge(Request $request, string $challenge): RedirectResponse
@@ -72,13 +73,14 @@ final class TwoFactorController extends Controller
     }
 
     /** Pemasangan 2FA (wajib untuk Admin Desa & Kepala Desa). */
-    public function setup(Request $request): View
+    public function setup(Request $request): Response|RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
 
         if ($user->hasTwoFactorEnabled()) {
-            return view('auth.two-factor-enabled');
+            return redirect()->route('dashboard')
+                ->with('status', 'Verifikasi dua langkah sudah aktif untuk akun Anda.');
         }
 
         $secret = $request->session()->get('2fa.pending_secret')
@@ -86,13 +88,13 @@ final class TwoFactorController extends Controller
 
         $request->session()->put('2fa.pending_secret', $secret);
 
-        return view('auth.two-factor-setup', [
+        return Inertia::render('Auth/TwoFactorSetup', [
             'secret' => $secret,
             'qrCode' => $this->twoFactor->qrCodeSvg($user, $secret),
         ]);
     }
 
-    public function confirm(Request $request): RedirectResponse|View
+    public function confirm(Request $request): RedirectResponse|Response
     {
         /** @var User $user */
         $user = $request->user();
@@ -116,6 +118,6 @@ final class TwoFactorController extends Controller
 
         // Kode pemulihan ditampilkan SATU KALI — setelahnya hanya hash yang
         // tersimpan, sehingga tidak dapat ditampilkan ulang.
-        return view('auth.two-factor-recovery-codes', ['codes' => $recoveryCodes]);
+        return Inertia::render('Auth/RecoveryCodes', ['codes' => $recoveryCodes]);
     }
 }

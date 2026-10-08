@@ -26,11 +26,27 @@ jobs:
       - name: Pasang dependensi
         run: composer install --prefer-dist --no-interaction --no-progress
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Pasang dependensi frontend
+        run: npm ci
+
       - name: Format kode (Pint)
         run: ./vendor/bin/pint --test
 
       - name: Analisis statis (PHPStan level 6)
         run: ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+      # TypeScript memeriksa props komponen Vue. Tanpa tahap ini, salah nama
+      # prop baru ketahuan saat petugas membuka halaman (KEP-008).
+      - name: Periksa tipe TypeScript & Vue
+        run: npx vue-tsc --noEmit
+
+      - name: Bangun aset produksi
+        run: npm run build
 
   security:
     name: Pemindaian Keamanan
@@ -93,6 +109,16 @@ jobs:
 
       - name: Pasang dependensi
         run: composer install --prefer-dist --no-interaction --no-progress
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Aset harus dibangun sebelum pengujian: respons Inertia memuat rujukan
+      # ke berkas hasil build lewat manifest Vite.
+      - name: Bangun aset
+        run: npm ci && npm run build
 
       - name: Siapkan lingkungan
         run: |

@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Reset kata sandi — FR-AUT-04, FR-AUT-10.
@@ -25,9 +26,9 @@ final class PasswordResetController extends Controller
 {
     public function __construct(private readonly AuditLogger $audit) {}
 
-    public function showRequestForm(): View
+    public function showRequestForm(): Response
     {
-        return view('auth.forgot-password');
+        return Inertia::render('Auth/ForgotPassword');
     }
 
     /**
@@ -84,9 +85,9 @@ final class PasswordResetController extends Controller
         );
     }
 
-    public function showResetForm(Request $request, string $token): View
+    public function showResetForm(Request $request, string $token): Response
     {
-        return view('auth.reset-password', [
+        return Inertia::render('Auth/ResetPassword', [
             'token' => $token,
             'identifier' => (string) $request->query('identifier', ''),
         ]);

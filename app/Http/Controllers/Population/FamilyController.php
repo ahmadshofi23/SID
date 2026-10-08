@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Population;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Population\StoreFamilyRequest;
 use App\Http\Requests\Population\UpdateFamilyRequest;
+use App\Http\Resources\HistoryPresenter;
+use App\Http\Resources\ResidentPresenter;
 use App\Repositories\FamilyRepository;
 use App\Repositories\ResidentRepository;
 use App\Services\Population\ChangeHistoryService;
@@ -16,105 +18,135 @@ use App\Support\ReferenceData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class FamilyController extends Controller
 {
-    public function __construct(
-        private readonly FamilyRepository $families,
-        private readonly ResidentRepository $residents,
-        private readonly FamilyService $service,
-        private readonly RegionService $regions,
-    ) {}
+    /*
+     * Tanpa konstruktor — lihat penjelasan di ResidentController. Singkatnya:
+     * Route menyimpan instance controller selama proses hidup, sehingga
+     * dependensi ber-lingkup akses WAJIB di-inject per metode.
+     */
 
-    public function index(Request $request): View
-    {
-        return view('kependudukan.keluarga.index', [
-            'families' => $this->families->search(
-                $request->string('q')->toString() ?: null,
-                array_filter($request->only(['region_id', 'welfare_status_code']))
-            ),
+    public function index(
+        Request $request,
+        FamilyRepository $families,
+        RegionService $regions,
+    ): Response {
+        $page = $families->search(
+            $request->string('q')->toString() ?: null,
+            array_filter($request->only(['region_id', 'welfare_status_code']))
+        );
+
+        return Inertia::render('Kependudukan/Keluarga/Index', [
+            'families' => [
+                'data' => array_map(ResidentPresenter::family(...), $page->items()),
+                'prev_url' => $page->previousPageUrl(),
+                'next_url' => $page->nextPageUrl(),
+                'count' => count($page->items()),
+            ],
             'q' => $request->string('q')->toString(),
             'filters' => $request->only(['region_id', 'welfare_status_code']),
-            'regions' => $this->regions->rtOptions(),
+            'regions' => $regions->rtOptions(),
             'references' => ReferenceData::forFamilyForm(),
         ]);
     }
 
-    public function show(string $id, ChangeHistoryService $history): View
-    {
-        $family = $this->families->findOrFail($id);
+    public function show(
+        string $id,
+        FamilyRepository $families,
+        ResidentRepository $residents,
+        ChangeHistoryService $history,
+    ): Response {
+        $family = $families->findOrFail($id);
         $family->load(['region.parent.parent']);
 
-        return view('kependudukan.keluarga.show', [
-            'family' => $family,
-            'members' => $this->residents->membersOfFamily($family->id),
-            'history' => $history->forEntity($family),
-            'references' => ReferenceData::labels(),
+        return Inertia::render('Kependudukan/Keluarga/Show', [
+            'family' => ResidentPresenter::family($family),
+            'members' => $residents->membersOfFamily($family->id)
+                ->map(ResidentPresenter::member(...))->values()->all(),
+            'history' => HistoryPresenter::collection($history->forEntity($family)),
         ]);
     }
 
-    public function create(): View
+    public function create(RegionService $regions): Response
     {
         $this->authorize('keluarga.tambah');
 
-        return view('kependudukan.keluarga.form', [
+        return Inertia::render('Kependudukan/Keluarga/Form', [
             'family' => null,
-            'regions' => $this->regions->rtOptions(),
+            'regions' => $regions->rtOptions(),
             'references' => ReferenceData::forFamilyForm(),
         ]);
     }
 
-    public function store(StoreFamilyRequest $request): RedirectResponse
+    public function store(StoreFamilyRequest $request, FamilyService $service): RedirectResponse
     {
         $this->authorize('keluarga.tambah');
 
-        $family = $this->service->create($request->validated());
+        $family = $service->create($request->validated());
 
         return redirect()
             ->route('keluarga.show', $family->id)
             ->with('status', 'Kartu keluarga berhasil dibuat. Tambahkan anggotanya sekarang.');
     }
 
-    public function edit(string $id): View
+    public function edit(string $id, FamilyRepository $families, RegionService $regions): Response
     {
         $this->authorize('keluarga.ubah');
 
-        return view('kependudukan.keluarga.form', [
-            'family' => $this->families->findOrFail($id),
-            'regions' => $this->regions->rtOptions(),
+        $family = $families->findOrFail($id);
+        $family->load('region.parent.parent');
+
+        return Inertia::render('Kependudukan/Keluarga/Form', [
+            'family' => ResidentPresenter::family($family),
+            'regions' => $regions->rtOptions(),
             'references' => ReferenceData::forFamilyForm(),
         ]);
     }
 
-    public function update(UpdateFamilyRequest $request, string $id): RedirectResponse
-    {
+    public function update(
+        UpdateFamilyRequest $request,
+        string $id,
+        FamilyRepository $families,
+        FamilyService $service,
+    ): RedirectResponse {
         $this->authorize('keluarga.ubah');
 
-        $family = $this->families->findOrFail($id);
-        $this->service->update($family, $request->validated());
+        $family = $families->findOrFail($id);
+        $service->update($family, $request->validated());
 
         return redirect()
             ->route('keluarga.show', $family->id)
             ->with('status', 'Perubahan kartu keluarga berhasil disimpan.');
     }
 
-    public function destroy(Request $request, string $id): RedirectResponse
-    {
+    public function destroy(
+        Request $request,
+        string $id,
+        FamilyRepository $families,
+        FamilyService $service,
+    ): RedirectResponse {
         $this->authorize('keluarga.hapus');
 
-        $family = $this->families->findOrFail($id);
+        $family = $families->findOrFail($id);
         $validated = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:500']]);
 
-        $this->service->delete($family, (string) $validated['reason']);
+        $service->delete($family, (string) $validated['reason']);
 
         return redirect()->route('keluarga.index')
             ->with('status', 'Kartu keluarga dihapus.');
     }
 
     /** Pindahkan anggota ke KK lain — FR-PDK-09. */
-    public function moveMember(Request $request, string $id): RedirectResponse
-    {
+    public function moveMember(
+        Request $request,
+        string $id,
+        FamilyRepository $families,
+        ResidentRepository $residents,
+        FamilyService $service,
+    ): RedirectResponse {
         $this->authorize('keluarga.ubah');
 
         $validated = $request->validate([
@@ -127,10 +159,10 @@ final class FamilyController extends Controller
             'target_family_id.different' => 'Kartu keluarga tujuan harus berbeda dari asal.',
         ]);
 
-        $resident = $this->residents->findOrFail((string) $validated['resident_id']);
-        $target = $this->families->findOrFail((string) $validated['target_family_id']);
+        $resident = $residents->findOrFail((string) $validated['resident_id']);
+        $target = $families->findOrFail((string) $validated['target_family_id']);
 
-        $this->service->moveMember(
+        $service->moveMember(
             $resident,
             $target,
             (string) $validated['family_relation_code'],
@@ -141,14 +173,17 @@ final class FamilyController extends Controller
             ->with('status', "{$resident->full_name} dipindahkan ke kartu keluarga lain.");
     }
 
-    public function revealKkNumber(string $id): JsonResponse
-    {
+    public function revealKkNumber(
+        string $id,
+        FamilyRepository $families,
+        FamilyService $service,
+    ): JsonResponse {
         $this->authorize('data_pribadi.lihat_penuh');
 
-        $family = $this->families->findOrFail($id);
+        $family = $families->findOrFail($id);
 
         return response()->json([
-            'nomor_kk' => $this->service->revealKkNumber($family),
+            'nomor_kk' => $service->revealKkNumber($family),
             'catatan' => 'Pembukaan data ini tercatat di log aktivitas.',
         ]);
     }

@@ -255,3 +255,90 @@ daftar, saringan, laporan, dan portal publik.
 Laravel, padahal **tidak ada satu pun view yang memakainya**. Perlu dibersihkan
 atau justru dimanfaatkan saat *island* pertama dipasang — jangan dibiarkan
 menggantung sebagai ketergantungan yang tidak jelas statusnya.
+
+---
+
+## KEP-008 — Panel admin **dipindahkan ke Vue 3 + Inertia + TypeScript**
+**Tanggal:** 2026-10-08 · **Status:** Disetujui · **Pemutus:** Pemilik proyek
+**Menggantikan:** KEP-005 · **Melampaui:** KEP-007 (yang menyarankan *island*, bukan penggantian menyeluruh)
+
+**Keputusan:** seluruh panel administrasi dibangun ulang dengan **Vue 3 + Inertia.js
++ TypeScript + Tailwind v4**, menggantikan Blade. Portal publik **tetap Blade (SSR)**
+demi SEO dan kecepatan muat pertama (ADR-006 tidak berubah).
+
+**Catatan jujur:** rekomendasi teknis saya adalah KEP-007 — Vue hanya pada layar yang
+menuntutnya. Pemilik proyek memilih penggantian menyeluruh setelah trade-off
+disampaikan dua kali. Keputusan itu sah dan dicatat apa adanya, berikut biayanya.
+
+**Yang bertambah ke jalur rilis:**
+| Sebelum | Sesudah |
+|---------|---------|
+| PHP + Laravel | PHP + Laravel + Node.js + Vue + TypeScript + proses *build* Vite |
+| `git pull && php artisan migrate` | ditambah `npm ci && npm run build` |
+| Tanpa artefak *build* | `public/build/` wajib dibangun ulang tiap rilis |
+
+Konsekuensi langsungnya: yang merawat sistem setelah serah terima perlu menguasai
+dua ekosistem, bukan satu (lihat alasan asli di KEP-005).
+
+**Yang diperoleh:**
+- Interaksi tanpa muat ulang halaman; saringan & pencarian terasa seketika.
+- Mode gelap/terang penuh dengan token semantik.
+- Komponen antarmuka bertipe (TypeScript) — galat props tertangkap saat *build*,
+  bukan saat petugas membuka halaman.
+- Fondasi siap untuk layar yang memang menuntutnya nanti (penyunting formulir
+  dinamis jenis surat, Sprint 4 — alasan asli KEP-007).
+
+**Yang TIDAK berubah, dan ini yang terpenting:**
+Seluruh aturan bisnis, otorisasi, pembatasan wilayah/keluarga, dan audit log berada
+di lapis *service*/*repository* yang tidak mengetahui apa pun tentang antarmuka.
+Penggantian ini menyentuh **lapis presentasi saja**. Bukti: 132 uji yang ada tetap
+berlaku; hanya 1 yang perlu disesuaikan (dari asersi HTML ke asersi props Inertia),
+dan justru menjadi lebih kuat.
+
+**Aturan baru yang mengikat:**
+1. Data yang dikirim ke peramban harus **sudah siap tampil dan sudah ter-masking**
+   (`App\Http\Resources\ResidentPresenter`). NIK apa adanya tidak pernah lewat sana.
+2. Kode referensi diterjemahkan di **sisi server**. Memelihara dua daftar label
+   (PHP dan TypeScript) berarti keduanya pasti berbeda suatu saat.
+3. Dependensi ber-lingkup akses **dilarang** di-inject lewat konstruktor controller —
+   lihat KEP-009.
+
+---
+
+## KEP-009 — Dependensi ber-lingkup akses hanya lewat **injeksi metode**
+**Tanggal:** 2026-10-08 · **Status:** Wajib · **Kategori:** keamanan
+
+**Masalah yang ditemukan:** `Illuminate\Routing\Route::getController()` menyimpan
+instance controller pada objek `Route`, dan objek `Route` hidup selama proses
+berjalan. Dependensi yang di-*inject* lewat konstruktor karena itu dibuat **sekali
+per proses**, bukan per permintaan.
+
+Untuk repository yang membawa `AccessScope`, akibatnya: **lingkup akses pengguna
+pertama ikut terpakai oleh pengguna berikutnya.**
+
+**Mengapa berbahaya justru karena tidak terlihat:**
+| Lingkungan | Terpicu? |
+|------------|----------|
+| PHP-FPM (satu proses, satu permintaan) | Tidak |
+| Pengujian HTTP berurutan | Ya |
+| **Laravel Octane** | **Ya, pada setiap permintaan kedua dan seterusnya** |
+
+Artinya bug ini dapat tidur sampai seseorang memasang Octane demi kinerja — lalu
+Kepala Dusun melihat data seluruh desa, atau Admin Desa justru terkunci di satu dusun.
+
+**Ditemukan bagaimana:** saat verifikasi Sprint 2 Vue, tiga peran berbeda yang
+diminta berurutan mengembalikan daftar penduduk yang **sama persis** (4 orang),
+padahal lapis repository bila diuji langsung memberi 4 / 7 / 3 dengan benar.
+
+**Keputusan:**
+1. Controller **tidak boleh** punya konstruktor yang menerima `ResidentRepository`,
+   `FamilyRepository`, `ResidentService`, `FamilyService`, `RegionService`, atau
+   `AccessScope`. Semuanya di-*inject* sebagai **parameter metode** — Laravel
+   menyelesaikannya pada setiap dispatch.
+2. `AccessScope` diikat `bind` (transient), bukan `scoped` atau `singleton`.
+3. Ditegakkan `tests/Architecture/RepositoryBoundaryTest.php`, dan diuji perilakunya
+   oleh `tests/Authorization/PopulationHttpScopeTest.php`
+   (`lingkup_tidak_bocor_antar_permintaan_berurutan`).
+
+Kedua penjaga diverifikasi balik: mengembalikan konstruktor membuat uji arsitektur
+gagal dan menyebut berkasnya.
