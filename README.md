@@ -4,7 +4,7 @@
 
 ```bash
 make setup && make serve     # http://localhost:8000 (termasuk npm ci && npm run build)
-make check                   # pint + phpstan + 134 uji (sama dengan CI)
+make check                   # pint + phpstan + vue-tsc + 135 uji (sama dengan CI)
 ```
 
 Panduan pengembangan: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -52,7 +52,8 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | 12 | [Glosarium](docs/12-glosarium.md) | Semua | 1.0 |
 | 13 | [Katalog Jenis Surat & Template](docs/13-katalog-surat.md) | BA, Dev, Sekdes | 1.0 |
 | 14 | [Laporan Sprint 1](docs/14-laporan-sprint-1.md) | PM, Dev, Sponsor | 1.0 |
-| 15 | [Laporan Sprint 2](docs/15-laporan-sprint-2.md) | PM, Dev, Sponsor | 1.0 |
+| 15 | [Laporan Sprint 2](docs/15-laporan-sprint-2.md) | PM, Dev, Sponsor | 1.1 |
+| 16 | [Perbaikan Pasca-Sprint 2](docs/16-perbaikan-pasca-sprint-2.md) | Dev | 1.0 |
 
 ## Cara membaca
 - **Non-teknis (Kades, Sekdes, sponsor):** 00, 01, 02, 11, 13

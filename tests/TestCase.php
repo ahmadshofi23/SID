@@ -25,9 +25,15 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        // Lazy loading dimatikan di produksi; di pengujian dibiarkan agar
-        // uji tidak gagal karena alasan yang tidak berkaitan dengan perilaku.
-        Model::preventLazyLoading(false);
+        /*
+         * Larangan lazy loading DINYALAKAN saat pengujian, sama seperti di
+         * lingkungan pengembangan dan staging.
+         *
+         * Dimatikan, uji tidak dapat menangkap relasi yang lupa di-eager-load —
+         * dan kelas bug itu muncul sebagai HTTP 500 di hadapan petugas desa,
+         * bukan di CI. Halaman Wilayah sempat rusak persis karena ini.
+         */
+        Model::preventLazyLoading(true);
     }
 
     /** Seeder minimum yang dibutuhkan hampir semua uji. */

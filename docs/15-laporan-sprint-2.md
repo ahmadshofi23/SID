@@ -101,9 +101,21 @@ tidak mungkin terlupakan di modul berikutnya.
 Dengan `preventLazyLoading` aktif, ini melempar galat — **HTTP 500 di halaman
 daftar penduduk**.
 
-**Lolos dari 127 uji** karena `TestCase` mematikan `preventLazyLoading`. Diperbaiki
-dua-duanya: logika penelusuran, **dan** pengujian kini menyalakan larangan tersebut
-sehingga kelas bug ini (berikut N+1 query) tertangkap otomatis.
+**Lolos dari 127 uji** karena `TestCase` mematikan `preventLazyLoading`.
+
+> ### ⚠ KOREKSI 2026-10-08
+>
+> Laporan ini semula menyatakan pengujian "kini menyalakan larangan tersebut".
+> **Itu tidak benar.** Penggantian teks pada `tests/TestCase.php` tidak cocok dengan
+> isi berkas dan gagal diam-diam; saya melaporkannya berhasil tanpa memverifikasi.
+>
+> Akibatnya nyata: halaman **Wilayah** rusak dengan HTTP 500 di hadapan pengguna
+> (`tree()` memuat dua tingkat sementara penyaji menelusuri tiga), dan uji yang
+> seharusnya menangkapnya justru lolos.
+>
+> Diperbaiki pada 2026-10-08 — rinci di [16 Perbaikan Pasca-Sprint 2](16-perbaikan-pasca-sprint-2.md).
+> Larangan lazy loading kini benar-benar aktif saat pengujian, dan langsung
+> memunculkan dua pelanggaran yang selama ini tersembunyi.
 
 ### 3.4 Penjaga arsitektur menangkap pelanggaran baru
 

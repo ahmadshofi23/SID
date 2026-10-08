@@ -7,6 +7,7 @@ namespace App\Services\Population;
 use App\Models\Region;
 use App\Repositories\ResidentRepository;
 use App\Services\Audit\AuditLogger;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -124,12 +125,35 @@ final class RegionService
      */
     public function tree(): Collection
     {
-        return Region::query()
-            ->with(['children.children'])
-            ->whereNull('parent_id')
+        /*
+         * Seluruh wilayah diambil dalam SATU kueri, lalu pohonnya dirakit di
+         * memori dan relasi `children` dipasang eksplisit.
+         *
+         * Pendekatan sebelumnya — with(['children.children']) — mengandung
+         * asumsi kedalaman: ia memuat dua tingkat sementara penyaji menelusuri
+         * tiga, sehingga halaman Wilayah gagal dengan HTTP 500 di tingkat RT.
+         * Menambah satu `.children` lagi hanya memindahkan masalahnya satu
+         * tingkat ke bawah; merakit di memori menghapus asumsinya sama sekali.
+         *
+         * Jumlah wilayah satu desa berkisar puluhan, jadi memuat semuanya jauh
+         * lebih murah daripada kueri bertingkat.
+         */
+        $all = Region::query()
             ->orderBy('sort_order')
             ->orderBy('code')
             ->get();
+
+        $byParent = $all->groupBy('parent_id');
+
+        foreach ($all as $region) {
+            $region->setRelation(
+                'children',
+                new EloquentCollection($byParent->get($region->id, collect())->all()),
+            );
+        }
+
+        return $all->filter(fn (Region $region): bool => $region->parent_id === null)
+            ->values();
     }
 
     /**

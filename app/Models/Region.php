@@ -142,11 +142,26 @@ final class Region extends Model
             $region->path = $region->buildPath();
         });
 
-        // Memindahkan wilayah mengubah path seluruh turunannya. Bila tidak
-        // disinkronkan, pembatasan akses Kepala Dusun akan salah.
+        /*
+         * Memindahkan wilayah mengubah path seluruh turunannya. Bila tidak
+         * disinkronkan, pembatasan akses Kepala Dusun akan salah.
+         *
+         * Dua hal yang disengaja di sini:
+         *  - `children()->get()` (kueri eksplisit), bukan `$region->children`
+         *    (akses relasi) — relasi itu tidak pernah dimuat pada alur simpan,
+         *    sehingga mengaksesnya melanggar larangan lazy loading.
+         *  - setRelation('parent', ...) pada setiap anak, agar buildPath() anak
+         *    punya induknya tanpa kueri tambahan. Tanpa itu, rekursi ke bawah
+         *    memicu satu kueri per simpul.
+         */
         self::saved(function (self $region): void {
-            if ($region->wasChanged('path')) {
-                $region->children->each->save();
+            if (! $region->wasChanged('path')) {
+                return;
+            }
+
+            foreach ($region->children()->get() as $child) {
+                $child->setRelation('parent', $region);
+                $child->save();
             }
         });
     }

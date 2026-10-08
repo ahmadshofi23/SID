@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Support\NameNormalizer;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\TestDox;
 use Tests\TestCase;
@@ -238,6 +239,43 @@ final class FamilyAndRegionTest extends TestCase
         $this->assertStringStartsWith('dusun-099/', $this->rt->path,
             'Path turunan tidak ikut disinkronkan — Kepala Dusun akan kehilangan '
             .'akses ke wilayahnya sendiri, atau memperoleh akses ke wilayah lain.');
+    }
+
+    #[Test]
+    #[TestDox('REGRESI: halaman Wilayah merender pohon 3 tingkat tanpa lazy loading')]
+    public function halaman_wilayah_merender_pohon_penuh(): void
+    {
+        /*
+         * REGRESI 2026-10-08 — HTTP 500 di halaman Wilayah.
+         *
+         * `tree()` memuat dua tingkat (with 'children.children') sementara
+         * penyaji menelusuri tiga, sehingga akses ke children milik RT
+         * melanggar larangan lazy loading.
+         *
+         * Uji ini lolos sebelumnya HANYA karena TestCase mematikan larangan
+         * tersebut. Larangan kini aktif, jadi uji inilah yang menjaga bahwa
+         * seluruh kedalaman pohon benar-benar termuat.
+         */
+        $response = $this->actingAs($this->userWithRole(Role::ADMIN_DESA))
+            ->get('/kependudukan/wilayah');
+
+        $response->assertOk();
+        $response->assertInertia(function (AssertableInertia $page): void {
+            $tree = $page->toArray()['props']['tree'];
+
+            $this->assertCount(2, $tree, 'Harus ada 2 dusun.');
+
+            $dusun = $tree[0];
+            $this->assertNotEmpty($dusun['children'], 'Dusun harus memuat RW.');
+
+            $rw = $dusun['children'][0];
+            $this->assertNotEmpty($rw['children'], 'RW harus memuat RT.');
+
+            // Tingkat terdalam: di sinilah bug aslinya meledak.
+            $rt = $rw['children'][0];
+            $this->assertSame('rt', $rt['level']);
+            $this->assertSame([], $rt['children'], 'RT tidak punya turunan.');
+        });
     }
 
     #[Test]
