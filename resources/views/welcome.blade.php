@@ -1,20 +1,25 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Desa {{ $village->name ?: 'Contoh' }} — Sistem Informasi Desa</title>
     <meta name="description" content="Situs resmi dan layanan administrasi Desa {{ $village->name }}.">
-    <link rel="stylesheet" href="{{ asset('css/sid.css') }}">
+
+    @include('partials.tema')
+
+    {{-- Satu sumber gaya dengan panel administrasi (design system di
+         resources/css/app.css), supaya portal publik tidak menyimpang. --}}
+    @vite(['resources/css/app.css'])
 </head>
-<body>
-<main class="sid-main">
-    <div class="sid-container--narrow sid-stack">
-        <div class="sid-center">
-            <div class="sid-auth__crest" aria-hidden="true">🏛</div>
-            <h1 class="sid-mb-0">Desa {{ $village->name ?: 'Contoh' }}</h1>
+<body class="h-full antialiased">
+<main class="flex min-h-full items-center justify-center p-6">
+    <div class="w-full max-w-xl space-y-6">
+        <div class="text-center">
+            <div class="text-5xl" aria-hidden="true">🏛</div>
+            <h1 class="mt-3 text-2xl font-semibold text-content">Desa {{ $village->name ?: 'Contoh' }}</h1>
             @if ($village->district)
-                <p class="sid-muted">Kec. {{ $village->district }}, Kab. {{ $village->regency }}</p>
+                <p class="mt-1 text-sm text-content-secondary">Kec. {{ $village->district }}, Kab. {{ $village->regency }}</p>
             @endif
         </div>
 
@@ -24,8 +29,9 @@
             (docs/11-roadmap-estimasi.md §2).
         </x-alert>
 
-        <div class="sid-center">
-            <a href="{{ route('login') }}" class="sid-btn sid-btn--primary">
+        <div class="text-center">
+            <a href="{{ route('login') }}"
+               class="touch-target inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 font-medium text-content-inverse transition-colors hover:bg-accent-hover">
                 Masuk ke sistem
             </a>
         </div>

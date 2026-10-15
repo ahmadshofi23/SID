@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,9 +20,16 @@ final class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        /*
+         * Nonce dibangkitkan SEBELUM permintaan diproses, karena tampilan yang
+         * dirender di dalam $next sudah harus dapat membacanya. Vite::useCspNonce()
+         * menyimpannya sehingga tag hasil @vite pun ikut menyandangnya.
+         */
+        $nonce = Vite::useCspNonce();
+
         $response = $next($request);
 
-        $csp = implode('; ', $this->contentSecurityPolicy());
+        $csp = implode('; ', $this->contentSecurityPolicy($nonce));
 
         $headers = [
             'Content-Security-Policy' => $csp,
@@ -54,9 +62,15 @@ final class SecurityHeaders
      * kebijakan ketat berlaku penuh, termasuk di staging — sehingga pelanggaran
      * CSP tertangkap sebelum produksi, bukan sesudahnya.
      *
+     * Skrip sebaris diizinkan HANYA lewat nonce per permintaan, bukan
+     * 'unsafe-inline'. Nonce yang berganti setiap permintaan tidak dapat
+     * ditebak penyerang, sehingga skrip yang disuntikkan tetap diblokir —
+     * sementara skrip tema di <head> (pencegah kedipan putih pada mode gelap)
+     * tetap boleh berjalan.
+     *
      * @return list<string>
      */
-    private function contentSecurityPolicy(): array
+    private function contentSecurityPolicy(string $nonce): array
     {
         $policy = [
             "default-src 'self'",
@@ -70,13 +84,25 @@ final class SecurityHeaders
         ];
 
         if (app()->environment('local')) {
+            // Vite dev server menyajikan CSS dan berkas font langsung dari
+            // originnya sendiri, jadi style-src/font-src bawaan ('self' saja)
+            // perlu diganti — bukan ditambah: pada CSP, direktif pertama yang
+            // menang, sehingga entri duplikat di belakang akan diabaikan.
+            $policy = array_values(array_filter(
+                $policy,
+                static fn (string $directive): bool => ! str_starts_with($directive, 'style-src ')
+                    && ! str_starts_with($directive, 'font-src '),
+            ));
+
             return [
                 ...$policy,
-                "script-src 'self' 'unsafe-eval' http://localhost:5173 http://127.0.0.1:5173",
+                "style-src 'self' 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173",
+                "font-src 'self' data: http://localhost:5173 http://127.0.0.1:5173",
+                "script-src 'self' 'nonce-{$nonce}' 'unsafe-eval' http://localhost:5173 http://127.0.0.1:5173",
                 "connect-src 'self' ws://localhost:5173 ws://127.0.0.1:5173 http://localhost:5173 http://127.0.0.1:5173",
             ];
         }
 
-        return [...$policy, "script-src 'self'", "connect-src 'self'"];
+        return [...$policy, "script-src 'self' 'nonce-{$nonce}'", "connect-src 'self'"];
     }
 }
