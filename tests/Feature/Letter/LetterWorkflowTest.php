@@ -12,6 +12,7 @@ use App\Models\Region;
 use App\Models\Resident;
 use App\Models\Role;
 use App\Support\NameNormalizer;
+use App\Support\VillageTime;
 use Database\Seeders\LetterTypeSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Inertia\Testing\AssertableInertia;
@@ -122,10 +123,15 @@ final class LetterWorkflowTest extends TestCase
         $this->assertSame($resident->nik_masked, $letter->snapshot['nik'],
             'Snapshot tidak boleh memuat NIK lengkap dalam bentuk polos.');
 
-        // Masa berlaku SKTM 3 bulan.
+        /*
+         * Masa berlaku SKTM 3 bulan, dihitung dari kalender desa — bukan UTC.
+         * Memakai now() di sini membuat uji ini gagal setiap malam antara
+         * pukul 00.00 dan 07.00 WIB, ketika tanggal desa sudah berganti
+         * sementara tanggal UTC belum.
+         */
         $this->assertNotNull($letter->valid_until);
         $this->assertSame(
-            now()->addMonths(3)->toDateString(),
+            VillageTime::now()->addMonths(3)->toDateString(),
             $letter->valid_until->toDateString(),
         );
 
