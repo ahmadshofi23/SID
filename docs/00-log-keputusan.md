@@ -433,3 +433,31 @@ header `X-Inertia`.
    dan repository.
 4. Uji yang memeriksa perilaku ini **wajib** mengirim header `X-Inertia`; tanpa itu,
    ia menguji jalur yang berbeda dari yang dipakai petugas.
+
+---
+
+## KEP-013 — Lingkup Sprint 5 diluruskan, dan PDF dirender lewat antarmuka berdriver
+**Tanggal:** 2026-10-15 · **Status:** Wajib · **Kategori:** lingkup, arsitektur
+
+**Masalah yang ditemukan:** dua dokumen memberi jawaban berbeda tentang isi Sprint 5.
+`docs/11 §2` menjadwalkan arsip, pembatalan, verifikasi publik, dan alur berjenjang
+di S5 — padahal keempatnya sudah selesai di Sprint 4 (`docs/18 §5`), karena surat
+yang dapat terbit tetapi tidak dapat dicari atau diperiksa keasliannya belum dapat
+diperagakan. Sementara `docs/18 §6` menaruh pengajuan daring oleh warga di S5,
+padahal `docs/11` menaruhnya di S6 bersama registrasi dan verifikasi akun warga —
+prasyarat yang tanpanya pengajuan daring tidak punya pemilik yang terverifikasi.
+
+**Keputusan:**
+1. Sprint 5 berisi **sisa nyata** persuratan: render PDF + QR, unggah berkas syarat,
+   dan pelacakan status pengajuan.
+2. **Pengajuan daring oleh warga tetap Sprint 6**, satu paket dengan registrasi dan
+   verifikasi akun warga. Memisahkannya menghasilkan pengajuan tanpa identitas yang
+   dapat dipercaya.
+3. Render PDF memakai **antarmuka `PdfRenderer` dengan dua driver**, bukan panggilan
+   langsung ke Gotenberg. Produksi memakai Gotenberg (KEP-004, ADR-003); pengembangan
+   di macOS memakai Chrome *headless* setempat, karena mesin pengembangan tidak
+   selalu punya runtime kontainer dan menunggu Docker terpasang akan menghentikan
+   pekerjaan yang tidak ada hubungannya dengan kontainer.
+4. Keluaran kedua driver **wajib diperiksa dengan surat yang sama**: perbedaan tata
+   letak antara mesin pengembang dan produksi adalah kelas bug yang hanya muncul
+   setelah surat dicetak di kantor desa.

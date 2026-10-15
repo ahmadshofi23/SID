@@ -46,7 +46,7 @@ rencana digitalisasinya disetujui.
 | **S2** | Kependudukan inti | CRUD penduduk & KK, wilayah, tabel referensi, pencarian, riwayat perubahan, *masking* data |
 | **S3** | Data & mutasi | Impor massal Excel (dengan pra-validasi), mutasi 4 jenis, laporan anomali, statistik agregat + tabel ringkasan `population_stats` |
 | **S4** | Persuratan I | Jenis surat + **seeder katalog 22 surat** (dok. 13), template WYSIWYG, formulir dinamis, pengajuan *walk-in*, mesin status, **penomoran otomatis** |
-| **S5** | Persuratan II | Render PDF + QR, verifikasi publik, alur persetujuan berjenjang, arsip, pembatalan, pelacakan status |
+| **S5** | Persuratan II | Render PDF + QR, unggah berkas syarat, pelacakan status (verifikasi publik, alur berjenjang, arsip, dan pembatalan sudah selesai di S4 — lihat KEP-013) |
 | **S6** | Portal & warga | Portal publik (profil, berita, pengumuman, agenda, layanan, statistik), registrasi & verifikasi akun warga, pengajuan daring, PWA |
 | **S7** | Pengaduan, laporan, stabilisasi | Pengaduan + penugasan + SLA, dashboard, laporan & ekspor, uji beban, uji penetrasi, perbaikan temuan |
 

@@ -216,7 +216,8 @@ pembersih yang sudah ada.
 dijadwalkan Sprint 5. Ketiganya tidak dapat dipisahkan dari penerbitan: surat yang
 dapat terbit tetapi tidak dapat dicari, dibatalkan, atau diperiksa keasliannya belum
 dapat diperagakan sebagai fitur. Yang benar-benar tersisa untuk Sprint 5 adalah
-render PDF (Gotenberg), unggah berkas, dan pengajuan daring oleh warga.
+render PDF (Gotenberg), unggah berkas, dan pelacakan status; pengajuan daring oleh
+warga dipindahkan ke Sprint 6 bersama registrasi akun warga (KEP-013).
 
 ---
 
@@ -226,7 +227,7 @@ render PDF (Gotenberg), unggah berkas, dan pengajuan daring oleh warga.
 |-----|---------|
 | Unggah berkas syarat | Sprint 5 |
 | Render PDF (Gotenberg) | Sprint 5, ADR-003 |
-| Pengajuan daring oleh warga | Sprint 5 |
+| Pengajuan daring oleh warga | Sprint 6, bersama registrasi & verifikasi akun warga (KEP-013) |
 | Penyuntingan alur persetujuan | Sprint 7, bersama pengaturan peran |
 | Tawaran mutasi otomatis dari SKL/SKM | Sprint 5 (dok. 13 §5.4, §5.5) |
 
