@@ -156,6 +156,9 @@ export interface IssuedLetter {
     status: 'sah' | 'dibatalkan'
     cancel_reason: string | null
     print_count: number
+    pdf_status: 'menunggu' | 'diproses' | 'selesai' | 'gagal'
+    pdf_ready: boolean
+    pdf_failed_reason: string | null
 }
 
 export interface LetterRequestLog {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Letter;
 
 use App\Auth\AccessScope;
+use App\Jobs\RenderLetterPdf;
 use App\Models\Letter;
 use App\Models\LetterRequest;
 use App\Models\LetterRequestLog;
@@ -324,6 +325,23 @@ final class LetterRequestService
                 'jenis_surat' => $type->code,
                 'tiket' => $request->ticket_number,
             ]);
+
+            /*
+             * PDF dirender di queue, SETELAH transaksi ini commit —
+             * ADR-003 & docs/04 §6 ("efek samping ditunda lewat queue
+             * setelah commit").
+             *
+             * afterCommit() bukan kerapian: tanpa itu, worker dapat
+             * mengambil pekerjaan ini sebelum barisnya terlihat di basis
+             * data, dan job akan gagal mencari surat yang baru saja
+             * diterbitkan — kegagalan yang hanya muncul di bawah beban.
+             *
+             * Kegagalan render TIDAK menggagalkan penerbitan: nomor surat
+             * sudah sah, isinya sudah tersimpan, dan suratnya sudah dapat
+             * dicetak dari layar. Yang hilang hanyalah berkas PDF-nya, dan
+             * itu dapat diulang dari halaman surat.
+             */
+            RenderLetterPdf::dispatch($letter->id)->afterCommit();
 
             return $letter;
         });

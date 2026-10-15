@@ -11,6 +11,7 @@ use App\Models\LetterType;
 use App\Models\VillageProfile;
 use App\Repositories\LetterRepository;
 use App\Services\Audit\AuditLogger;
+use App\Services\Letter\LetterQrCode;
 use App\Services\Letter\LetterRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,8 +73,12 @@ final class LetterController extends Controller
      * terbit harus tampil sama persis seperti saat ditandatangani, walau
      * templatnya sudah lima kali disunting sejak itu.
      */
-    public function print(string $id, LetterRepository $letters, AuditLogger $audit): Response
-    {
+    public function print(
+        string $id,
+        LetterRepository $letters,
+        AuditLogger $audit,
+        LetterQrCode $qr,
+    ): Response {
         $this->authorize('surat.lihat');
 
         $letter = $letters->findOrFail($id);
@@ -101,6 +106,14 @@ final class LetterController extends Controller
                 ...LetterRequestPresenter::letter($letter),
                 'title_on_letter' => $letter->letterType->title_on_letter,
                 'rendered_html' => $letter->rendered_html,
+                /*
+                 * QR dibuat DI SERVER, bukan diambil peramban dari layanan
+                 * pembuat QR pihak ketiga seperti pada Sprint 4: layanan itu
+                 * menerima kode verifikasi setiap surat desa, dan surat
+                 * berhenti dapat dicetak ketika layanannya mati. Gambar yang
+                 * sama dipakai di PDF (LetterPdfDocument).
+                 */
+                'qr_svg' => $qr->svg($letter->verification_code),
                 /*
                  * `snapshot` TIDAK dikirim ke peramban.
                  *

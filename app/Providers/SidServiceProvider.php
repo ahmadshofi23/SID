@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Models\VillageProfile;
 use App\Repositories\FamilyRepository;
 use App\Repositories\ResidentRepository;
+use App\Services\Pdf\PdfRenderer;
+use App\Services\Pdf\PdfRendererFactory;
 use App\Support\Pii\PiiCipher;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +56,16 @@ final class SidServiceProvider extends ServiceProvider
         $this->app->bind(FamilyRepository::class, fn ($app) => new FamilyRepository(
             $app->make(AccessScope::class)
         ));
+
+        /*
+         * Driver PDF dipilih lewat konfigurasi (KEP-013 §3), bukan dipanggil
+         * langsung oleh kode penerbitan surat. bind(), bukan singleton():
+         * uji pembandingan dua driver mengganti config('pdf.driver') di
+         * tengah proses, dan instance yang di-cache akan membuatnya menguji
+         * driver yang sama dua kali.
+         */
+        $this->app->singleton(PdfRendererFactory::class, fn () => new PdfRendererFactory);
+        $this->app->bind(PdfRenderer::class, fn ($app) => $app->make(PdfRendererFactory::class)->make());
     }
 
     public function boot(): void

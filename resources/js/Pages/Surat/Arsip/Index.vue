@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import { Archive, FilterX, Printer, CircleX } from '@lucide/vue'
+import { Archive, FilterX, Printer, CircleX, FileDown } from '@lucide/vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppButton from '@/Components/AppButton.vue'
 import SelectField from '@/Components/SelectField.vue'
@@ -165,10 +165,21 @@ function issuedDate(iso: string): string {
                             </span>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <AppButton :href="`/surat/arsip/${row.id}/cetak`" size="sm">
-                                <Printer class="size-4" aria-hidden="true" />
-                                Cetak
-                            </AppButton>
+                            <div class="flex items-center justify-end gap-2">
+                                <AppButton
+                                    v-if="row.pdf_ready"
+                                    :href="`/surat/arsip/${row.id}/pdf`"
+                                    size="sm"
+                                    external
+                                >
+                                    <FileDown class="size-4" aria-hidden="true" />
+                                    PDF
+                                </AppButton>
+                                <AppButton :href="`/surat/arsip/${row.id}/cetak`" size="sm">
+                                    <Printer class="size-4" aria-hidden="true" />
+                                    Cetak
+                                </AppButton>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

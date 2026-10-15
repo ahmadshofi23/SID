@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Letter\LetterController;
+use App\Http\Controllers\Letter\LetterPdfController;
 use App\Http\Controllers\Letter\LetterRequestController;
 use App\Http\Controllers\Letter\LetterTypeController;
 use App\Http\Controllers\Letter\LetterVerificationController;
@@ -192,6 +193,14 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:surat.lihat')->name('surat.cetak');
         Route::post('arsip/{id}/batalkan', [LetterController::class, 'cancel'])
             ->middleware('izin:surat.batalkan')->name('surat.batalkan');
+
+        // Unduhan PDF (Sprint 5). Lingkup wilayah/keluarga diperiksa di
+        // setiap permintaan lewat LetterRepository — tidak ada URL
+        // pra-tanda-tangan yang dapat beredar lepas dari pemeriksaan itu.
+        Route::get('arsip/{id}/pdf', [LetterPdfController::class, 'download'])
+            ->middleware('izin:surat.lihat')->name('surat.pdf');
+        Route::post('arsip/{id}/pdf/ulangi', [LetterPdfController::class, 'retry'])
+            ->middleware('izin:surat.lihat')->name('surat.pdf-ulangi');
 
         Route::get('{id}', [LetterRequestController::class, 'show'])
             ->middleware('izin:surat.lihat')->name('surat.show');

@@ -15,6 +15,7 @@ use Database\Seeders\VillageSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\Testing\TestResponse;
@@ -34,6 +35,16 @@ abstract class TestCase extends BaseTestCase
          * bukan di CI. Halaman Wilayah sempat rusak persis karena ini.
          */
         Model::preventLazyLoading(true);
+
+        /*
+         * Disk PDF SELALU dipalsukan saat pengujian.
+         *
+         * Queue berjalan `sync` di sini, jadi setiap uji yang menerbitkan
+         * surat ikut merender PDF-nya. Tanpa disk tiruan, rangkaian uji
+         * menumpuk berkas di storage/app/private milik pengembang — sampah
+         * yang tidak pernah dibersihkan dan sempat terbawa ke repositori.
+         */
+        Storage::fake((string) config('pdf.disk', 'local'));
     }
 
     /** Seeder minimum yang dibutuhkan hampir semua uji. */

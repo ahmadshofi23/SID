@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ArrowLeft, Printer, CircleX, QrCode } from '@lucide/vue'
+import { ArrowLeft, Printer, CircleX, QrCode, FileDown, RotateCw, TriangleAlert, Clock } from '@lucide/vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppAlert from '@/Components/AppAlert.vue'
@@ -12,6 +12,7 @@ import type { IssuedLetter } from '@/types'
 interface PrintableLetter extends IssuedLetter {
     title_on_letter: string
     rendered_html: string
+    qr_svg: string
 }
 
 const props = defineProps<{
@@ -42,19 +43,26 @@ function cancelLetter(): void {
     })
 }
 
-const verificationUrl = `${window.location.origin}/surat/verifikasi/${props.letter.verification_code}`
-
 /*
- * QR dibuat di peramban dari URL verifikasi, bukan diambil dari layanan luar.
- *
- * Memakai layanan pembuat QR pihak ketiga berarti mengirim kode verifikasi
- * setiap surat desa ke server orang lain, dan surat berhenti dapat dicetak
- * ketika layanan itu mati. Sprint 5 menanamkannya langsung ke PDF.
+ * QR datang dari server sebagai SVG (App\Services\Letter\LetterQrCode),
+ * tidak lagi dari layanan pembuat QR pihak ketiga seperti pada Sprint 4.
+ * Layanan luar menerima kode verifikasi setiap surat desa, dan suratnya
+ * berhenti dapat dicetak ketika layanan itu mati. Gambar yang sama ditanam
+ * ke dalam PDF, sehingga apa yang dilihat di layar = apa yang tercetak.
  */
-const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(verificationUrl)}`
 
 function printLetter(): void {
     window.print()
+}
+
+const groupedCode = (props.letter.verification_code.match(/.{1,4}/g) ?? []).join(' ')
+
+/* ---------------------------- Berkas PDF (Sprint 5) --------------------- */
+
+const pdfForm = useForm({})
+
+function retryPdf(): void {
+    pdfForm.post(`/surat/arsip/${props.letter.id}/pdf/ulangi`, { preserveScroll: true })
 }
 
 function issuedLong(iso: string): string {
@@ -99,10 +107,49 @@ function issuedLong(iso: string): string {
                     Batalkan surat
                 </AppButton>
 
+                <!-- Berkas PDF: hanya muncul bila berkasnya memang ada.
+                     Tombol unduh yang selalu menghasilkan galat lebih buruk
+                     daripada tidak ada tombol sama sekali. -->
+                <AppButton
+                    v-if="letter.pdf_ready"
+                    :href="`/surat/arsip/${letter.id}/pdf`"
+                    external
+                >
+                    <FileDown class="size-4" aria-hidden="true" />
+                    Unduh PDF
+                </AppButton>
+
+                <span
+                    v-else-if="letter.pdf_status === 'menunggu' || letter.pdf_status === 'diproses'"
+                    class="inline-flex items-center gap-1.5 text-sm text-content-secondary"
+                >
+                    <Clock class="size-4" aria-hidden="true" />
+                    PDF sedang dirender — muat ulang halaman sebentar lagi.
+                </span>
+
                 <p class="ml-auto text-sm text-content-tertiary">
                     Sudah dicetak {{ letter.print_count }}&times;
                 </p>
             </div>
+
+            <!-- Kegagalan render TIDAK disembunyikan: tanpa pesan ini, surat
+                 tampak "sedang diproses" selamanya dan petugas menunggu
+                 sesuatu yang tidak akan datang (KEP-013). -->
+            <AppAlert v-if="letter.pdf_status === 'gagal'" type="warning" class="mb-5">
+                <p class="flex items-center gap-1.5 font-medium">
+                    <TriangleAlert class="size-4" aria-hidden="true" />
+                    Berkas PDF surat ini gagal dibuat
+                </p>
+                <p class="mt-1">{{ letter.pdf_failed_reason }}</p>
+                <p class="mt-1 text-xs">
+                    Surat tetap sah dan tetap dapat dicetak dari halaman ini.
+                    Yang belum ada hanyalah berkas PDF-nya.
+                </p>
+                <AppButton class="mt-3" :loading="pdfForm.processing" @click="retryPdf">
+                    <RotateCw class="size-4" aria-hidden="true" />
+                    Ulangi pembuatan PDF
+                </AppButton>
+            </AppAlert>
 
             <section v-if="showCancel" class="card mb-5 p-4" aria-label="Pembatalan surat">
                 <h2 class="mb-2 font-semibold">Batalkan surat {{ letter.letter_number }}</h2>
@@ -193,13 +240,17 @@ function issuedLong(iso: string): string {
                     <!-- QR verifikasi: pihak penerima dapat memeriksa keasliannya
                          tanpa menelepon kantor desa (FR-SRT-14). -->
                     <div class="text-center text-xs">
-                        <img :src="qrSrc" alt="" class="mx-auto size-24">
+                        <!-- eslint-disable-next-line vue/no-v-html -->
+                        <div class="qr mx-auto size-24" v-html="letter.qr_svg" />
                         <p class="mt-1 flex items-center justify-center gap-1">
                             <QrCode class="size-3" aria-hidden="true" />
                             Periksa keaslian
                         </p>
-                        <p class="font-mono text-[10px] tracking-wider">
-                            {{ letter.verification_code }}
+                        <!-- Dikelompokkan empat-empat, sama seperti di PDF:
+                             kode ini diketik ulang dari kertas ketika
+                             pemindai QR penerima tidak berfungsi. -->
+                        <p class="font-mono text-[10px] leading-snug">
+                            {{ groupedCode }}
                         </p>
                     </div>
 
@@ -222,6 +273,8 @@ export default { name: 'CetakSurat' }
 </script>
 
 <style scoped>
+.qr :deep(svg) { width: 100%; height: 100%; display: block; }
+
 /*
  * Ukuran kertas dan margin dalam MILIMETER.
  *

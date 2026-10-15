@@ -192,6 +192,14 @@ final class LetterRequestPresenter
             'status' => $letter->status,
             'cancel_reason' => $letter->cancel_reason,
             'print_count' => $letter->print_count,
+            /*
+             * Status PDF ikut dikirim agar layar dapat membedakan "sedang
+             * dirender" dari "gagal" — tanpa itu, satu-satunya yang dapat
+             * ditampilkan adalah "menunggu" tanpa akhir (KEP-013).
+             */
+            'pdf_status' => $letter->pdf_status,
+            'pdf_ready' => $letter->hasPdf(),
+            'pdf_failed_reason' => $letter->pdf_failed_reason,
         ];
     }
 }

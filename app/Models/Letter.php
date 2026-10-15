@@ -37,6 +37,10 @@ use LogicException;
  * @property array<string, mixed> $snapshot
  * @property string $rendered_html
  * @property string|null $pdf_path
+ * @property string|null $pdf_hash
+ * @property string $pdf_status
+ * @property string|null $pdf_failed_reason
+ * @property Carbon|null $pdf_rendered_at
  * @property string $verification_code
  * @property string $status
  * @property Carbon|null $cancelled_at
@@ -62,6 +66,15 @@ final class Letter extends Model
 
     public const STATUS_CANCELLED = 'dibatalkan';
 
+    /* Status perenderan PDF — Sprint 5, KEP-013. */
+    public const PDF_PENDING = 'menunggu';
+
+    public const PDF_RENDERING = 'diproses';
+
+    public const PDF_READY = 'selesai';
+
+    public const PDF_FAILED = 'gagal';
+
     /**
      * Kolom yang masih boleh berubah setelah surat terbit.
      *
@@ -72,6 +85,7 @@ final class Letter extends Model
     private const MUTABLE_AFTER_ISSUE = [
         'status', 'cancelled_at', 'cancelled_by', 'cancel_reason',
         'print_count', 'pdf_path', 'pdf_hash',
+        'pdf_status', 'pdf_failed_reason', 'pdf_rendered_at',
     ];
 
     protected static function booted(): void
@@ -103,6 +117,7 @@ final class Letter extends Model
             'issued_at' => 'datetime',
             'valid_until' => 'date',
             'cancelled_at' => 'datetime',
+            'pdf_rendered_at' => 'datetime',
             'created_at' => 'datetime',
         ];
     }
@@ -143,6 +158,25 @@ final class Letter extends Model
     {
         return $this->status === self::STATUS_VALID
             && ($this->valid_until === null || ! $this->valid_until->isPast());
+    }
+
+    /** PDF siap diunduh? */
+    public function hasPdf(): bool
+    {
+        return $this->pdf_status === self::PDF_READY
+            && $this->pdf_path !== null && $this->pdf_path !== '';
+    }
+
+    /**
+     * Nama berkas unduhan.
+     *
+     * Garis miring pada nomor surat (470/12/SKTM/2026) adalah pemisah
+     * direktori di setiap sistem berkas — dibiarkan, berkasnya tersimpan di
+     * tempat yang tidak diduga petugas, atau namanya terpotong.
+     */
+    public function pdfFileName(): string
+    {
+        return 'Surat-'.str_replace(['/', '\\'], '-', $this->letter_number).'.pdf';
     }
 
     public function isExpired(): bool

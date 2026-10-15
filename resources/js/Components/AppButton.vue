@@ -14,6 +14,10 @@ const props = withDefaults(defineProps<{
     loading?: boolean
     disabled?: boolean
     block?: boolean
+    /* Tautan biasa, bukan navigasi Inertia. Wajib untuk unduhan berkas:
+       Link mengambil URL lewat XHR, dan peramban tidak akan pernah
+       menyimpan berkasnya. */
+    external?: boolean
 }>(), {
     variant: 'secondary',
     size: 'md',
@@ -45,7 +49,11 @@ const classes = computed(() => [
 </script>
 
 <template>
-    <Link v-if="href" :href="href" :class="classes">
+    <a v-if="href && external" :href="href" :class="classes">
+        <slot />
+    </a>
+
+    <Link v-else-if="href" :href="href" :class="classes">
         <slot />
     </Link>
 

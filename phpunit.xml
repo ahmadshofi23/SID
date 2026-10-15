@@ -35,6 +35,15 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!--
+          Queue berjalan `sync` saat pengujian, jadi setiap penerbitan surat
+          ikut merender PDF-nya. Tanpa driver tiruan, tiap uji penerbitan
+          akan menjalankan Chromium sungguhan — lambat, dan mustahil di CI
+          yang tidak punya peramban. Uji yang memang menguji driver memilih
+          drivernya sendiri lewat config().
+        -->
+        <env name="PDF_DRIVER" value="fake"/>
+        <env name="PDF_DISK" value="local"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_DATABASE" value="sid_desa_test"/>
