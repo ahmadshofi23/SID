@@ -6,16 +6,20 @@ namespace App\Http\Controllers\Letter;
 
 use App\Auth\AccessScope;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\LetterAttachmentPresenter;
 use App\Http\Resources\LetterRequestPresenter;
 use App\Models\LetterRequest;
 use App\Models\LetterType;
 use App\Models\Official;
 use App\Repositories\LetterRequestRepository;
 use App\Services\Letter\DynamicFormValidator;
+use App\Services\Letter\LetterAttachmentService;
 use App\Services\Letter\LetterNumberService;
 use App\Services\Letter\LetterRequestService;
+use App\Services\Upload\FileSignature;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,15 +71,18 @@ final class LetterRequestController extends Controller
         LetterRequestRepository $requests,
         DynamicFormValidator $forms,
         LetterNumberService $numbers,
+        LetterAttachmentService $attachments,
     ): Response {
         $this->authorize('surat.lihat');
 
         $request = $requests->findOrFail($id);
-        $request->load(['letterType', 'resident.family', 'logs', 'letter']);
+        $request->load(['letterType', 'resident.family', 'logs', 'letter', 'attachments']);
 
         return Inertia::render('Surat/Pengajuan/Detail', [
             'request' => LetterRequestPresenter::detail($request),
             'form_fields' => $forms->fields($request->letterType),
+            'attachments' => LetterAttachmentPresenter::forRequest($request),
+            'upload' => self::uploadConstraints($attachments),
             /*
              * Nomor berikutnya ditampilkan agar petugas tahu nomor berapa
              * yang akan terbit. Ini PERKIRAAN: nomor sebenarnya ditetapkan
@@ -94,8 +101,11 @@ final class LetterRequestController extends Controller
     }
 
     /** Formulir pengajuan di loket — FR-SRT-05. */
-    public function create(Request $request, DynamicFormValidator $forms): Response
-    {
+    public function create(
+        Request $request,
+        DynamicFormValidator $forms,
+        LetterAttachmentService $attachments,
+    ): Response {
         $this->authorize('surat.ajukan');
 
         $types = LetterType::query()->active()->orderBy('sort_order')->get();
@@ -113,6 +123,7 @@ final class LetterRequestController extends Controller
                 'warning_note' => $t->warning_note,
             ])->all(),
             'selected_type_id' => $selected?->id,
+            'upload' => self::uploadConstraints($attachments),
         ]);
     }
 
@@ -120,6 +131,7 @@ final class LetterRequestController extends Controller
         Request $request,
         AccessScope $scope,
         LetterRequestService $service,
+        LetterAttachmentService $attachments,
     ): RedirectResponse {
         $this->authorize('surat.ajukan');
 
@@ -132,6 +144,19 @@ final class LetterRequestController extends Controller
 
         $type = LetterType::query()->findOrFail($validated['letter_type_id']);
 
+        /*
+         * Lampiran diperiksa SEBELUM pengajuan dibuat.
+         *
+         * Urutan sebaliknya meninggalkan pengajuan bernomor tiket yang
+         * berkasnya ditolak — petugas melihat pesan galat sekaligus tiket
+         * baru di antrean, dan menduga pengajuannya gagal padahal sudah ada.
+         *
+         * @var array<string, UploadedFile> $berkas
+         */
+        $berkas = self::uploadedRequirementFiles($request);
+
+        $attachments->assertAllValid($berkas);
+
         $letterRequest = $service->create(
             scope: $scope,
             type: $type,
@@ -140,6 +165,17 @@ final class LetterRequestController extends Controller
             formInput: $request->input('form', []),
             channel: 'walk_in',
         );
+
+        $letterRequest->setRelation('letterType', $type);
+
+        foreach ($berkas as $field => $file) {
+            $attachments->store(
+                $letterRequest,
+                $file,
+                self::requirementIndexFromField($field, $type),
+                $field,
+            );
+        }
 
         return to_route('surat.show', $letterRequest->id)
             ->with('success', 'Pengajuan dibuat dengan tiket '.$letterRequest->ticket_number.'.');
@@ -287,5 +323,56 @@ final class LetterRequestController extends Controller
         $service->cancel($requests->findOrFail($id), $request->input('reason'));
 
         return back()->with('success', 'Pengajuan dibatalkan.');
+    }
+
+    /**
+     * Berkas syarat dari formulir pembuatan, berkunci `syarat.<indeks>`.
+     *
+     * Dikumpulkan sendiri, bukan lewat $request->validate(['syarat.*' => ...]),
+     * karena kuncinya harus tetap utuh sampai ke pesan galat: petugas perlu
+     * melihat berkas MANA yang ditolak, dan daftar syarat di layar diurutkan
+     * persis menurut indeks itu.
+     *
+     * @return array<string, UploadedFile>
+     */
+    private static function uploadedRequirementFiles(Request $request): array
+    {
+        $files = [];
+
+        foreach ((array) $request->file('syarat', []) as $index => $file) {
+            if ($file instanceof UploadedFile) {
+                $files['syarat.'.$index] = $file;
+            }
+        }
+
+        return $files;
+    }
+
+    /** `syarat.3` → 3, bila jenis surat ini benar punya syarat ke-3. */
+    private static function requirementIndexFromField(string $field, LetterType $type): ?int
+    {
+        $index = (int) str_replace('syarat.', '', $field);
+
+        return isset($type->requirements[$index]) ? $index : null;
+    }
+
+    /**
+     * Batasan unggahan yang DITAMPILKAN di layar.
+     *
+     * Dikirim dari server, bukan ditulis ulang sebagai angka tetap di Vue:
+     * batas 5 MB berasal dari config/sid.php, dan dua sumber kebenaran
+     * berarti layar suatu saat akan menjanjikan batas yang tidak sama
+     * dengan yang sungguh diterima.
+     *
+     * @return array<string, mixed>
+     */
+    private static function uploadConstraints(LetterAttachmentService $attachments): array
+    {
+        return [
+            'accept' => FileSignature::acceptAttribute(),
+            'max_bytes' => $attachments->maxBytes(),
+            'max_label' => $attachments->humanSize($attachments->maxBytes()),
+            'types_label' => FileSignature::acceptedLabels(),
+        ];
     }
 }

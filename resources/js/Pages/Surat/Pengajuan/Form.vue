@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ArrowLeft, TriangleAlert, Clock, Send } from '@lucide/vue'
+import { ArrowLeft, Clock, Send, Upload, X } from '@lucide/vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppAlert from '@/Components/AppAlert.vue'
@@ -9,7 +9,9 @@ import SelectField from '@/Components/SelectField.vue'
 import TextField from '@/Components/TextField.vue'
 import ResidentPicker from '@/Components/ResidentPicker.vue'
 import DynamicFormFields from '@/Components/DynamicFormFields.vue'
-import type { LetterFormField, LetterFormValues, LetterRequirement } from '@/types'
+import type {
+    LetterFormField, LetterFormValues, LetterRequirement, UploadConstraints,
+} from '@/types'
 
 interface TypeOption {
     id: string
@@ -24,6 +26,7 @@ interface TypeOption {
 const props = defineProps<{
     types: TypeOption[]
     selected_type_id: string | null
+    upload: UploadConstraints
 }>()
 
 const form = useForm({
@@ -31,6 +34,9 @@ const form = useForm({
     resident_id: null as string | null,
     purpose: '',
     form: {} as LetterFormValues,
+    /* Berkas syarat, berkunci indeks syarat — lihat `syarat.<indeks>` di
+       LetterRequestController::uploadedRequirementFiles(). */
+    syarat: {} as Record<number, File | null>,
 })
 
 const selectedType = computed(() =>
@@ -46,6 +52,9 @@ const selectedType = computed(() =>
 watch(() => form.letter_type_id, () => {
     form.form = {}
     form.purpose = ''
+    /* Berkas ikut dikosongkan: daftar syarat jenis surat berikutnya berbeda,
+       dan berkas yang tertinggal akan masuk sebagai syarat yang salah. */
+    form.syarat = {}
     form.clearErrors()
 })
 
@@ -59,8 +68,37 @@ const needsPurposeField = computed(() =>
     selectedType.value !== null
     && !selectedType.value.fields.some((f) => f.name === 'keperluan'))
 
+/** Berkas terpilih per syarat, untuk ditampilkan kembali di daftar. */
+const chosen = ref<Record<number, string>>({})
+
+function pick(index: number, event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null
+
+    form.syarat[index] = file
+    chosen.value = { ...chosen.value, [index]: file?.name ?? '' }
+    form.clearErrors(`syarat.${index}` as never)
+}
+
+function clearPick(index: number): void {
+    form.syarat[index] = null
+    chosen.value = { ...chosen.value, [index]: '' }
+}
+
+/** Galat per kotak berkas, dikirim server dengan kunci `syarat.<indeks>`. */
+function uploadError(index: number): string | undefined {
+    return (form.errors as Record<string, string>)[`syarat.${index}`]
+}
+
 function submit(): void {
-    form.post('/surat', { preserveScroll: true })
+    /*
+     * forceFormData WAJIB di sini.
+     *
+     * Inertia hanya beralih ke FormData bila ada berkas pada payload, dan
+     * pengajuan tanpa lampiran sama sahnya dengan yang berlampiran. Tanpa
+     * ini, perilaku kirimnya berbeda-beda tergantung ada tidaknya berkas —
+     * dan hanya satu dari dua jalur itu yang pernah diuji tangan.
+     */
+    form.post('/surat', { preserveScroll: true, forceFormData: true })
 }
 </script>
 
@@ -165,29 +203,66 @@ function submit(): void {
                     class="card p-4"
                     aria-label="Syarat berkas"
                 >
-                    <h2 class="mb-3 font-semibold">Syarat berkas</h2>
-                    <ul class="space-y-2 text-sm">
-                        <li
-                            v-for="(req, i) in selectedType.requirements"
-                            :key="i"
-                            class="flex items-start gap-2"
-                        >
-                            <span
-                                class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-medium"
-                                :class="req.required
-                                    ? 'bg-danger-soft text-danger'
-                                    : 'bg-surface-hover text-content-tertiary'"
-                            >
-                                {{ req.required ? 'Wajib' : 'Opsional' }}
-                            </span>
-                            {{ req.label }}
+                    <h2 class="mb-1 font-semibold">Syarat berkas</h2>
+                    <p class="mb-3 text-xs text-content-tertiary">
+                        {{ upload.types_label }}, maksimal {{ upload.max_label }} per berkas.
+                        Berkas boleh menyusul — pengajuan tetap dapat dibuat tanpanya.
+                    </p>
+
+                    <ul class="space-y-3 text-sm">
+                        <li v-for="(req, i) in selectedType.requirements" :key="i">
+                            <p class="flex items-start gap-2">
+                                <span
+                                    class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-medium"
+                                    :class="req.required
+                                        ? 'bg-danger-soft text-danger'
+                                        : 'bg-surface-hover text-content-tertiary'"
+                                >
+                                    {{ req.required ? 'Wajib' : 'Opsional' }}
+                                </span>
+                                {{ req.label }}
+                            </p>
+
+                            <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                                <label>
+                                    <span class="sr-only">Pilih berkas untuk: {{ req.label }}</span>
+                                    <input
+                                        type="file"
+                                        class="sr-only"
+                                        :accept="upload.accept"
+                                        @change="pick(i, $event)"
+                                    >
+                                    <span
+                                        class="inline-flex h-9 cursor-pointer items-center gap-1.5
+                                               rounded-lg border border-line-control bg-surface px-3
+                                               text-xs font-medium hover:bg-surface-hover"
+                                    >
+                                        <Upload class="size-3.5" aria-hidden="true" />
+                                        {{ chosen[i] ? 'Ganti' : 'Pilih berkas' }}
+                                    </span>
+                                </label>
+
+                                <span
+                                    v-if="chosen[i]"
+                                    class="inline-flex min-w-0 items-center gap-1 text-xs text-content-secondary"
+                                >
+                                    <span class="truncate">{{ chosen[i] }}</span>
+                                    <button
+                                        type="button"
+                                        class="shrink-0 cursor-pointer rounded p-0.5 hover:text-danger"
+                                        :aria-label="`Batalkan berkas untuk ${req.label}`"
+                                        @click="clearPick(i)"
+                                    >
+                                        <X class="size-3.5" aria-hidden="true" />
+                                    </button>
+                                </span>
+                            </div>
+
+                            <p v-if="uploadError(i)" class="mt-1 text-xs text-danger" role="alert">
+                                {{ uploadError(i) }}
+                            </p>
                         </li>
                     </ul>
-                    <p class="mt-3 inline-flex items-start gap-1.5 text-xs text-content-tertiary">
-                        <TriangleAlert class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                        Unggahan berkas tersedia pada Sprint 5. Periksa berkas fisik
-                        yang dibawa pemohon.
-                    </p>
                 </section>
             </aside>
         </form>

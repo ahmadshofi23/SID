@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Letter\LetterAttachmentController;
 use App\Http\Controllers\Letter\LetterController;
 use App\Http\Controllers\Letter\LetterPdfController;
 use App\Http\Controllers\Letter\LetterRequestController;
@@ -215,6 +216,20 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:surat.verifikasi')->name('surat.tolak');
         Route::post('{id}/batalkan', [LetterRequestController::class, 'cancel'])
             ->middleware('izin:surat.ubah')->name('surat.batalkan-pengajuan');
+
+        /*
+         * Lampiran syarat (Sprint 5, KEP-013 §1).
+         *
+         * Berkas dialirkan lewat aplikasi, bukan lewat URL pra-tanda-tangan
+         * penyimpanan: lingkup wilayah/keluarga harus diperiksa pada SETIAP
+         * permintaan, dan URL yang beredar lepas tidak dapat diperiksa lagi.
+         */
+        Route::post('{id}/lampiran', [LetterAttachmentController::class, 'store'])
+            ->middleware('izin:surat.ubah')->name('surat.lampiran.store');
+        Route::get('{id}/lampiran/{berkas}', [LetterAttachmentController::class, 'show'])
+            ->middleware('izin:surat.lihat')->name('surat.lampiran.show');
+        Route::delete('{id}/lampiran/{berkas}', [LetterAttachmentController::class, 'destroy'])
+            ->middleware('izin:surat.ubah')->name('surat.lampiran.destroy');
 
         // Penerbitan: di sinilah nomor surat terbit (RULE-04, ADR-001).
         Route::post('{id}/terbitkan', [LetterRequestController::class, 'issue'])

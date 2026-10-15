@@ -143,6 +143,35 @@ export interface LetterRequirement {
     required: boolean
 }
 
+/** Lampiran syarat pengajuan — Sprint 5, KEP-013 §1. */
+export interface LetterAttachment {
+    id: string
+    /** Posisi syarat saat berkas diunggah; null = berkas tambahan. */
+    requirement_index: number | null
+    /** Salinan label syarat saat itu — dapat berbeda dari daftar terkini. */
+    requirement_label: string | null
+    original_name: string
+    download_name: string
+    mime: string
+    extension: string
+    is_image: boolean
+    size_bytes: number
+    size_label: string
+    uploaded_by_name: string | null
+    uploaded_at: string
+    url: string
+    /** false bila barisnya ada tetapi berkasnya tidak lagi di penyimpanan. */
+    tersedia: boolean
+}
+
+/** Batasan unggahan, dikirim server agar layar tidak menjanjikan batas lain. */
+export interface UploadConstraints {
+    accept: string
+    max_bytes: number
+    max_label: string
+    types_label: string
+}
+
 export interface IssuedLetter {
     id: string
     letter_number: string

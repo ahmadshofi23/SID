@@ -11,12 +11,17 @@ import AppAlert from '@/Components/AppAlert.vue'
 import SelectField from '@/Components/SelectField.vue'
 import TextareaField from '@/Components/TextareaField.vue'
 import LetterStatusBadge from '@/Components/LetterStatusBadge.vue'
+import LampiranPanel from '@/Components/LampiranPanel.vue'
 import { usePageData } from '@/composables/usePage'
-import type { LetterRequestDetail, LetterFormField } from '@/types'
+import type {
+    LetterRequestDetail, LetterFormField, LetterAttachment, UploadConstraints,
+} from '@/types'
 
 const props = defineProps<{
     request: LetterRequestDetail
     form_fields: LetterFormField[]
+    attachments: LetterAttachment[]
+    upload: UploadConstraints
     next_number_preview: string | null
     signers: { id: string; name: string; position: string }[]
 }>()
@@ -34,6 +39,17 @@ const { can, user } = usePageData()
  */
 const warningAcknowledged = ref(false)
 const fieldCheckAcknowledged = ref(false)
+
+/*
+ * Lampiran dapat diubah hanya SEBELUM surat terbit (ADR-003).
+ *
+ * Setelah surat keluar, berkas syarat yang mendasarinya ikut menjadi arsip:
+ * tanpa itu, pertanyaan "atas dasar apa surat ini terbit?" tidak lagi dapat
+ * dijawab saat pemeriksaan. Penegakannya ada di LetterAttachmentService;
+ * di sini tombolnya hanya disembunyikan agar tidak menjanjikan yang mustahil.
+ */
+const canManageAttachments = computed(() =>
+    can('surat.ubah') && props.request.status !== 'diterbitkan')
 
 const needsWarningAck = computed(() => props.request.warning_note !== null)
 const needsFieldCheckAck = computed(() => props.request.requires_field_check)
@@ -253,35 +269,15 @@ function formatDate(value: string | null): string {
                     </p>
                 </section>
 
-                <!-- Syarat berkas -->
-                <section
-                    v-if="request.requirements.length > 0"
-                    class="card p-4"
-                    aria-label="Syarat berkas"
-                >
-                    <h2 class="mb-3 font-semibold">Syarat berkas</h2>
-                    <p class="mb-3 text-sm text-content-secondary">
-                        Unggahan berkas tersedia pada Sprint 5. Untuk sekarang,
-                        periksa berkas fisik yang dibawa pemohon.
-                    </p>
-                    <ul class="space-y-1.5 text-sm">
-                        <li
-                            v-for="(req, i) in request.requirements"
-                            :key="i"
-                            class="flex items-start gap-2"
-                        >
-                            <span
-                                class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-medium"
-                                :class="req.required
-                                    ? 'bg-danger-soft text-danger'
-                                    : 'bg-surface-hover text-content-tertiary'"
-                            >
-                                {{ req.required ? 'Wajib' : 'Opsional' }}
-                            </span>
-                            {{ req.label }}
-                        </li>
-                    </ul>
-                </section>
+                <!-- Syarat berkas & lampirannya -->
+                <LampiranPanel
+                    v-if="request.requirements.length > 0 || attachments.length > 0"
+                    :request-id="request.id"
+                    :requirements="request.requirements"
+                    :attachments="attachments"
+                    :upload="upload"
+                    :editable="canManageAttachments"
+                />
 
                 <!-- Riwayat -->
                 <section class="card p-4" aria-label="Riwayat status">

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,6 +39,7 @@ use Illuminate\Support\Str;
  * @property-read LetterType $letterType
  * @property-read Resident $resident
  * @property-read Letter|null $letter
+ * @property-read Collection<int, LetterAttachment> $attachments
  */
 final class LetterRequest extends Model
 {
@@ -168,6 +170,18 @@ final class LetterRequest extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(LetterRequestLog::class, 'request_id');
+    }
+
+    /**
+     * Lampiran syarat — Sprint 5, KEP-013 §1.
+     *
+     * @return HasMany<LetterAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(LetterAttachment::class, 'request_id')
+            ->orderBy('requirement_index')
+            ->orderBy('created_at');
     }
 
     /** @return HasOne<Letter, $this> */

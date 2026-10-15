@@ -59,6 +59,29 @@ return [
         'complaints',
     ],
 
+    /*
+    | Berkas unggahan — NFR-SEC-05, docs/04 §6 "Berkas".
+    |
+    | Disk PRIVAT: `local` saat pengembangan (storage/app/private, DI LUAR
+    | web root), `s3` di produksi. Lampiran syarat berisi fotokopi KTP dan
+    | Kartu Keluarga; tidak boleh ada satu pun yang dapat diambil dengan
+    | menebak URL-nya. Karena itu pula tidak ada URL pra-tanda-tangan yang
+    | beredar: setiap permintaan melewati pemeriksaan lingkup wilayah.
+    */
+    'uploads' => [
+        'disk' => env('UPLOAD_DISK', env('FILESYSTEM_DISK', 'local')),
+
+        // 5 MB per berkas (docs/03 §120 poin 5). Fotokopi KTP hasil pindai
+        // ponsel jauh di bawah ini; batasnya ada agar satu unggahan tidak
+        // menghabiskan kuota penyimpanan desa.
+        'max_bytes' => 5 * 1024 * 1024,
+
+        // Banyaknya berkas per pengajuan. Jenis surat dengan syarat
+        // terpanjang (SKKL) meminta lima berkas; kelipatannya memberi ruang
+        // untuk halaman kedua fotokopi tanpa membuka pintu penyalahgunaan.
+        'max_per_request' => 20,
+    ],
+
     // Penyamaran sel kecil pada statistik publik — ADR-008
     'stats_small_cell_threshold' => 5,
 ];
