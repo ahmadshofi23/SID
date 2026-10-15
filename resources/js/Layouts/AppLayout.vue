@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
 import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
-    ChartColumn, ShieldAlert, Upload,
+    ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
     Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
@@ -69,6 +69,24 @@ const groups = computed<NavGroup[]>(() => [
         ],
     },
     {
+        /*
+         * "Antrean Surat" lebih dulu, bukan "Arsip": layar yang dibuka
+         * petugas setiap pagi adalah daftar pengajuan yang menunggu, dan
+         * menu pertama di sebuah kelompok adalah yang paling mudah dicari.
+         */
+        label: 'Persuratan',
+        items: [
+            { label: 'Antrean Surat', route: '/surat',
+              pattern: '/surat', icon: Mail, show: can('surat.lihat') },
+            { label: 'Ajukan Surat', route: '/surat/ajukan',
+              pattern: '/surat/ajukan', icon: FileCheck, show: can('surat.ajukan') },
+            { label: 'Arsip Surat', route: '/surat/arsip',
+              pattern: '/surat/arsip', icon: Archive, show: can('surat.lihat') },
+            { label: 'Jenis Surat', route: '/jenis-surat',
+              pattern: '/jenis-surat', icon: Settings2, show: can('jenis_surat.lihat') },
+        ],
+    },
+    {
         label: 'Pengaturan',
         items: [
             { label: 'Log Aktivitas', route: '/pengaturan/log-aktivitas',
@@ -77,10 +95,31 @@ const groups = computed<NavGroup[]>(() => [
     },
 ].filter((group) => group.items.some((item) => item.show)))
 
-function isActive(pattern: string): boolean {
-    const path = typeof window === 'undefined' ? '' : window.location.pathname
+const currentPath = computed(() =>
+    typeof window === 'undefined' ? '' : window.location.pathname)
 
-    return path === pattern || path.startsWith(`${pattern}/`)
+/*
+ * Pola TERPANJANG yang cocok yang dianggap aktif, bukan setiap pola yang
+ * cocok.
+ *
+ * Tanpa ini, "/surat" ikut menyala saat halaman "/surat/arsip" dibuka,
+ * sehingga tiga menu tampak aktif bersamaan dan penanda posisi kehilangan
+ * artinya (WCAG nav-state-active).
+ */
+const activePattern = computed<string | null>(() => {
+    const path = currentPath.value
+
+    const matches = groups.value
+        .flatMap((group) => group.items)
+        .filter((item) => item.show)
+        .map((item) => item.pattern)
+        .filter((pattern) => path === pattern || path.startsWith(`${pattern}/`))
+
+    return matches.sort((a, b) => b.length - a.length)[0] ?? null
+})
+
+function isActive(pattern: string): boolean {
+    return activePattern.value === pattern
 }
 
 function logout(): void {

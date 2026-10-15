@@ -15,6 +15,7 @@ final class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             VillageSeeder::class,
+            LetterTypeSeeder::class,
         ]);
 
         /*

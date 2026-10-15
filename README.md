@@ -1,6 +1,6 @@
 # Sistem Informasi Desa (SID)
 
-**Status:** Sprint 3 (Data & Mutasi) **selesai** — lihat [laporan Sprint 3](docs/17-laporan-sprint-3.md).
+**Status:** Sprint 4 (Persuratan) **selesai** — lihat [laporan Sprint 4](docs/18-laporan-sprint-4.md).
 
 ```bash
 make setup && make serve     # http://localhost:8000 (termasuk npm ci && npm run build)
@@ -55,6 +55,7 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | 15 | [Laporan Sprint 2](docs/15-laporan-sprint-2.md) | PM, Dev, Sponsor | 1.1 |
 | 16 | [Perbaikan Pasca-Sprint 2](docs/16-perbaikan-pasca-sprint-2.md) | Dev | 1.0 |
 | 17 | [Laporan Sprint 3](docs/17-laporan-sprint-3.md) | PM, Dev, Sponsor | 1.0 |
+| 18 | [Laporan Sprint 4](docs/18-laporan-sprint-4.md) | PM, Dev, Sponsor | 1.0 |
 
 ## Cara membaca
 - **Non-teknis (Kades, Sekdes, sponsor):** 00, 01, 02, 11, 13

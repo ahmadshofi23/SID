@@ -342,3 +342,94 @@ padahal lapis repository bila diuji langsung memberi 4 / 7 / 3 dengan benar.
 
 Kedua penjaga diverifikasi balik: mengembalikan konstruktor membuat uji arsitektur
 gagal dan menyebut berkasnya.
+
+---
+
+## KEP-010 — Waktu disimpan UTC, **keputusan kalender memakai zona desa**
+**Tanggal:** 2026-10-15 · **Status:** Wajib · **Kategori:** korektness data
+
+**Masalah yang ditemukan:** aplikasi berjalan dan menyimpan waktu dalam UTC — itu
+benar untuk penyimpanan. Tetapi beberapa keputusan harus memakai **kalender di
+kantor desa**, dan keduanya berbeda tepat di saat-saat yang paling merugikan.
+
+| Keputusan | Bila memakai UTC |
+|-----------|------------------|
+| Tahun & bulan pada nomor surat | Surat 1 Januari pukul 02.00 WIB bernomor `…/XII/2026` padahal buku agenda desa mencatatnya sebagai surat pertama 2027 |
+| Tahun penghitung nomor | Berbeda dari tahun yang tercetak → nomor 1 tahun baru terbit dua kali |
+| `letters.issued_year` (generated `YEAR(issued_at)`) | Indeks unik `uq_letters_seq` menjaga pasangan tahun yang salah, sehingga **jaring pengaman terakhir terhadap nomor ganda tidak berfungsi** |
+| "Akhir hari kerja" untuk SLA | Jatuh pukul 07.00 pagi berikutnya di Indonesia; laporan SLA menganggap surat terlambat masih tepat waktu |
+| Tanggal tercetak di surat | Surat bertanggal 31 Desember sementara nomornya menyebut Januari — dokumen bertentangan dengan dirinya sendiri |
+
+**Mengapa tidak tertangkap pengujian:** seluruh uji penomoran lolos. Mereka memeriksa
+hal yang benar, dan jawabannya memang benar — sepanjang tahun. Cacatnya hanya muncul
+pada satu malam dalam setahun. Ditemukan dengan menelusuri alur persuratan di
+peramban dan membaca batas waktu yang tertulis di layar.
+
+**Keputusan:**
+1. Penyimpanan tetap UTC (`APP_TIMEZONE=UTC`). Tidak diubah.
+2. `App\Support\VillageTime` menjadi **satu-satunya** sumber kalender desa. Zonanya
+   diambil dari `village_profile.timezone`, **bukan** ditulis tetap `Asia/Jakarta` —
+   Indonesia punya tiga zona waktu (WIB/WITA/WIT).
+3. Yang WAJIB melewatinya: tahun penghitung nomor, token `{bulan}`/`{tahun}`,
+   `letters.issued_year`, `valid_until`, tanggal tercetak, dan batas waktu SLA.
+4. `letters.issued_year` bukan lagi *generated column*. Ia **ditulis aplikasi** dari
+   sumber yang sama dengan penomoran (migrasi `2026_01_03_000200`), agar jaring
+   pengaman basis data tidak bergantung pada zona waktu server.
+5. Label sisa waktu ("Jatuh tempo besok") disusun **di server**, bukan dihitung
+   peramban: perangkat petugas memakai zona waktunya sendiri.
+
+Diuji oleh `tests/Feature/Letter/LetterTimezoneTest.php` dan **diverifikasi balik**:
+mengembalikan `VillageTime::zone()` ke `'UTC'` menggagalkan empat uji.
+
+---
+
+## KEP-011 — Badan surat disusun server dan **disimpan utuh**
+**Tanggal:** 2026-10-15 · **Status:** Wajib · **Kategori:** arsitektur, kepatuhan
+
+**Masalah yang ditemukan:** tata letak surat (dok. 13 §2) terdiri dari kop, pembuka,
+blok identitas, isi pokok, dan penutup. Hanya **isi pokok** yang berasal dari
+template yang disunting petugas; sisanya dibentuk sistem.
+
+Semula bagian sistem itu dirakit halaman cetak Vue dari kolom `snapshot`. Itu
+melanggar ADR-003 secara halus: **menyunting halaman Vue akan mengubah tampilan surat
+yang sudah terbit bertahun-tahun lalu**, padahal arsip harus tetap sama seperti saat
+ditandatangani. Dua cacat nyata lahir dari situ — blok identitas menampilkan NIK
+tersamar (tidak sah untuk dokumen yang dicocokkan dengan KTP), dan judul jabatan
+tercetak "Kepala Desa Desa Sukamaju".
+
+**Keputusan:**
+1. `App\Services\Letter\LetterBodyComposer` menyusun badan surat **utuh** saat
+   penerbitan; hasilnya disimpan apa adanya di `letters.rendered_html`.
+2. Halaman cetak **tidak merakit bagian mana pun** dari badan surat. Ia hanya
+   menambahkan kop desa (yang memang boleh mengikuti identitas desa terkini) dan
+   blok tanda tangan dari kolom yang tersimpan di surat itu sendiri.
+3. NIK **lengkap** masuk ke badan surat — itu memang isi surat keterangan desa.
+   `snapshot` tetap menyimpan versi tersamar, dan pengungkapannya **selalu** tercatat
+   di audit log (RULE-07), tanpa syarat.
+4. `snapshot` tidak dikirim ke peramban: seluruh isinya sudah ada di
+   `rendered_html`.
+
+---
+
+## KEP-012 — Penolakan izin **wajib terlihat** di antarmuka Inertia
+**Tanggal:** 2026-10-15 · **Status:** Wajib · **Kategori:** kegunaan, keamanan
+
+**Masalah yang ditemukan:** Inertia menangani balasan 403/409 atas sebuah POST dengan
+**tidak mengubah apa pun di layar**. Petugas menekan tombol, dan tidak terjadi
+apa-apa — lalu menekannya berulang kali dan menyimpulkan sistemnya rusak.
+
+Seluruh pengujian tetap hijau: uji memeriksa **kode status**, dan kode statusnya
+memang benar. Yang membedakan permintaan biasa dari permintaan Inertia hanyalah
+header `X-Inertia`.
+
+**Keputusan:**
+1. Penolakan 403/409 pada permintaan Inertia non-GET dialihkan kembali ke halaman
+   asal dengan pesan kesalahan yang tampil sebagai notifikasi
+   (`bootstrap/app.php`).
+2. Tindakan yang **bukan kewenangan** pengguna tidak ditampilkan sebagai tombol,
+   melainkan diganti keterangan siapa yang berwenang — petugas perlu tahu kepada
+   siapa berkasnya diteruskan, bukan sekadar bahwa ia ditolak.
+3. Ini kenyamanan, **bukan** kontrol keamanan. Penegakannya tetap di lapis layanan
+   dan repository.
+4. Uji yang memeriksa perilaku ini **wajib** mengirim header `X-Inertia`; tanpa itu,
+   ia menguji jalur yang berbeda dari yang dipakai petugas.

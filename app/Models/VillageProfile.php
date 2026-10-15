@@ -16,6 +16,17 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $district
  * @property string $regency
  * @property string $province
+ *
+ * MENGAPA NULLABLE: current() mengembalikan instance KOSONG bila baris
+ * profil desa belum ada (pemasangan baru, sebelum seeder dijalankan),
+ * sehingga atribut apa pun dapat bernilai null walau kolomnya NOT NULL.
+ * @property string|null $timezone
+ * @property string|null $address
+ * @property string|null $postal_code
+ * @property string|null $phone
+ * @property string|null $email
+ * @property string|null $website
+ * @property string|null $logo_path
  */
 final class VillageProfile extends Model
 {

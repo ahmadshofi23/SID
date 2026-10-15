@@ -53,11 +53,39 @@ return Application::configure(basePath: dirname(__DIR__))
          * penyerang.
          */
         $exceptions->respond(function ($response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            /*
+             * PENOLAKAN HARUS TERLIHAT PETUGAS.
+             *
+             * Inertia menangani balasan 403/409 atas sebuah POST dengan
+             * TIDAK MENGUBAH APA PUN di layar: tombol ditekan, dan tidak
+             * terjadi apa-apa. Petugas desa menyimpulkan sistemnya rusak,
+             * lalu menekannya berulang kali.
+             *
+             * Ditemukan saat menelusuri alur persetujuan surat di peramban —
+             * seluruh pengujian otomatis tetap hijau, karena uji memeriksa
+             * KODE STATUS, dan kode statusnya memang benar.
+             *
+             * Karena itu penolakan pada permintaan Inertia dialihkan kembali
+             * ke halaman asal dengan pesan kesalahan yang tampil sebagai
+             * notifikasi (lihat FlashMessages.vue).
+             */
+            if (
+                in_array($status, [403, 409], true)
+                && $request->header('X-Inertia')
+                && ! $request->isMethod('GET')
+            ) {
+                return back()->with('error', $e->getMessage() !== ''
+                    ? $e->getMessage()
+                    : 'Tindakan ini tidak dapat dilakukan.');
+            }
+
             if (! app()->isProduction() || $request->expectsJson()) {
                 return $response;
             }
 
-            if ($response->getStatusCode() === 500) {
+            if ($status === 500) {
                 return response()->view('errors.500', [
                     'correlationId' => $request->attributes->get('correlation_id'),
                 ], 500);

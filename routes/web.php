@@ -6,6 +6,10 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Letter\LetterController;
+use App\Http\Controllers\Letter\LetterRequestController;
+use App\Http\Controllers\Letter\LetterTypeController;
+use App\Http\Controllers\Letter\LetterVerificationController;
 use App\Http\Controllers\Population\AnomalyController;
 use App\Http\Controllers\Population\FamilyController;
 use App\Http\Controllers\Population\ImportController;
@@ -25,6 +29,15 @@ use Inertia\Inertia;
 */
 
 Route::view('/', 'welcome')->name('home');
+
+/* ------------------------ Verifikasi surat (publik) ---------------------
+ | TANPA otentikasi: dipakai bank, sekolah, dan kantor kecamatan yang
+ | menerima surat dari warga (FR-SRT-14). Dibatasi laju karena kode
+ | verifikasi dapat dicoba-coba — lihat LetterVerificationController.
+ */
+Route::get('surat/verifikasi/{kode}', LetterVerificationController::class)
+    ->middleware('throttle:30,1')
+    ->name('surat.verifikasi');
 
 /* --------------------------- Tamu (belum masuk) ------------------------- */
 Route::middleware('guest')->group(function (): void {
@@ -158,6 +171,59 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:wilayah.kelola')->name('wilayah.update');
         Route::delete('wilayah/{region}', [RegionController::class, 'destroy'])
             ->middleware('izin:wilayah.kelola')->name('wilayah.destroy');
+    });
+
+    /* -------------------------- Persuratan (Sprint 4) -------------------- */
+    Route::prefix('surat')->group(function (): void {
+
+        // Antrean & pemrosesan pengajuan
+        Route::get('/', [LetterRequestController::class, 'index'])
+            ->middleware('izin:surat.lihat')->name('surat.index');
+        Route::get('ajukan', [LetterRequestController::class, 'create'])
+            ->middleware('izin:surat.ajukan')->name('surat.create');
+        Route::post('/', [LetterRequestController::class, 'store'])
+            ->middleware('izin:surat.ajukan')->name('surat.store');
+
+        // Arsip surat terbit — DIDAFTARKAN SEBELUM `{id}` agar tidak
+        // tertangkap sebagai UUID pengajuan.
+        Route::get('arsip', [LetterController::class, 'index'])
+            ->middleware('izin:surat.lihat')->name('surat.arsip');
+        Route::get('arsip/{id}/cetak', [LetterController::class, 'print'])
+            ->middleware('izin:surat.lihat')->name('surat.cetak');
+        Route::post('arsip/{id}/batalkan', [LetterController::class, 'cancel'])
+            ->middleware('izin:surat.batalkan')->name('surat.batalkan');
+
+        Route::get('{id}', [LetterRequestController::class, 'show'])
+            ->middleware('izin:surat.lihat')->name('surat.show');
+        Route::put('{id}', [LetterRequestController::class, 'update'])
+            ->middleware('izin:surat.ubah')->name('surat.update');
+
+        Route::post('{id}/verifikasi', [LetterRequestController::class, 'verify'])
+            ->middleware('izin:surat.verifikasi')->name('surat.verifikasi-pengajuan');
+        Route::post('{id}/revisi', [LetterRequestController::class, 'requestRevision'])
+            ->middleware('izin:surat.verifikasi')->name('surat.revisi');
+        Route::post('{id}/tolak', [LetterRequestController::class, 'reject'])
+            ->middleware('izin:surat.verifikasi')->name('surat.tolak');
+        Route::post('{id}/batalkan', [LetterRequestController::class, 'cancel'])
+            ->middleware('izin:surat.ubah')->name('surat.batalkan-pengajuan');
+
+        // Penerbitan: di sinilah nomor surat terbit (RULE-04, ADR-001).
+        Route::post('{id}/terbitkan', [LetterRequestController::class, 'issue'])
+            ->middleware('izin:surat.setujui')->name('surat.terbitkan');
+    });
+
+    /* ------------------------ Jenis surat & template --------------------- */
+    Route::prefix('jenis-surat')->group(function (): void {
+        Route::get('/', [LetterTypeController::class, 'index'])
+            ->middleware('izin:jenis_surat.lihat')->name('jenis-surat.index');
+        Route::post('pratinjau', [LetterTypeController::class, 'preview'])
+            ->middleware('izin:jenis_surat.kelola')->name('jenis-surat.preview');
+        Route::get('{id}/ubah', [LetterTypeController::class, 'edit'])
+            ->middleware('izin:jenis_surat.kelola')->name('jenis-surat.edit');
+        Route::put('{id}', [LetterTypeController::class, 'update'])
+            ->middleware('izin:jenis_surat.kelola')->name('jenis-surat.update');
+        Route::post('{id}/aktif', [LetterTypeController::class, 'toggle'])
+            ->middleware('izin:jenis_surat.kelola')->name('jenis-surat.toggle');
     });
 
     Route::get('pengaturan/log-aktivitas', fn () => Inertia::render('Placeholder', [

@@ -75,6 +75,12 @@ final class Family extends Model
         $this->kk_number_masked = Nik::mask($normalized);
     }
 
+    /** Nomor KK apa adanya — PEMAKAIAN WAJIB dicatat di audit log (RULE-07). */
+    public function revealKkNumber(): ?string
+    {
+        return $this->kk_number_enc;
+    }
+
     /** @return HasMany<Resident, $this> */
     public function members(): HasMany
     {
