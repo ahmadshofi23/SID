@@ -8,7 +8,9 @@ use App\Models\Letter;
 use App\Models\LetterRequest;
 use App\Models\LetterRequestLog;
 use App\Models\Role;
+use App\Support\NameMask;
 use App\Support\VillageTime;
+use Illuminate\Support\Carbon;
 
 /**
  * Penerjemah pengajuan surat untuk lapis tampilan.
@@ -148,6 +150,115 @@ final class LetterRequestPresenter
             ),
             'letter' => $request->letter === null ? null : self::letter($request->letter),
         ];
+    }
+
+    /**
+     * Pelacakan status oleh warga pada halaman publik — FR-SRT-13, BR-11.
+     *
+     * Payload TERPISAH dari detail(), bukan detail() yang dipangkas: layar
+     * petugas akan terus bertambah isinya, dan setiap tambahan di sana akan
+     * ikut terkirim ke halaman publik tanpa ada yang meninjaunya. Di sini
+     * seluruh kunci ditulis satu per satu, sehingga menambah data pribadi
+     * ke halaman publik harus menjadi keputusan yang disengaja.
+     *
+     * TIDAK ADA di sini: NIK (termasuk yang tersamar), isi formulir,
+     * alamat, dan nama petugas pemeriksa.
+     *
+     * @return array<string, mixed>
+     */
+    public static function tracking(LetterRequest $request): array
+    {
+        $letter = $request->letter;
+
+        return [
+            'ticket_number' => $request->ticket_number,
+            'status' => $request->status,
+            'status_label' => LetterRequest::statusLabels()[$request->status] ?? $request->status,
+            'letter_type' => $request->letterType->name,
+            // Nama tersamar: pemohon cukup mengenali tanda terimanya sendiri.
+            // Pasangan tiket + tanggal lahir bisa saja ditebak, dan halaman
+            // ini tidak boleh menjadi cara memastikan nama seorang warga.
+            'resident_name' => NameMask::partial($request->resident->full_name),
+            'current_step' => $request->current_step,
+            'step_total' => $request->letterType->verificationStepCount(),
+            'is_open' => $request->isOpen(),
+            'is_overdue' => $request->isOverdue(),
+            /*
+             * Tanggal, bukan ISO: halaman ini dibaca warga, dan tanggal
+             * mentah akan diformat ulang di peramban dengan zona waktu
+             * perangkatnya sendiri — "selesai 17 Okt" bisa terbaca "16 Okt"
+             * pada ponsel yang zonanya belum diatur.
+             */
+            'submitted_at' => self::villageDateTime($request->submitted_at),
+            'due_at' => self::villageDate($request->due_at),
+            'completed_at' => self::villageDateTime($request->completed_at),
+            'rejection_reason' => $request->rejection_reason,
+            'revision_note' => $request->revision_note,
+            /*
+             * Tahap `draft` DIBUANG dari riwayat publik.
+             *
+             * Pengajuan loket dibuat dan dikirim dalam detik yang sama,
+             * sehingga warga akan melihat "Draf" dan "Diajukan" dengan waktu
+             * yang persis sama — yang hanya terbaca seperti kesalahan
+             * sistem. Riwayat lengkapnya tetap utuh di layar petugas.
+             */
+            'timeline' => array_map(
+                self::trackingStep(...),
+                $request->logs
+                    ->sortBy('created_at')
+                    ->reject(fn (LetterRequestLog $log): bool => $log->to_status === LetterRequest::STATUS_DRAFT)
+                    ->values()
+                    ->all(),
+            ),
+            /*
+             * Surat terbit: nomornya saja, agar warga dapat menyebutnya saat
+             * mengambil surat di kantor desa. Tanpa kode verifikasi, tanpa
+             * tautan unduh — berkasnya hanya boleh diambil lewat rute
+             * berlingkup, dan halaman ini tidak berlingkup.
+             */
+            'letter_number' => $letter?->letter_number,
+            'issued_at' => self::villageDate($letter?->issued_at),
+        ];
+    }
+
+    /**
+     * Satu tahap pada riwayat waktu publik.
+     *
+     * `actor_name` SENGAJA TIDAK DIKIRIM. Warga perlu tahu pengajuannya
+     * sudah diperiksa dan kapan, bukan nama petugas yang memeriksanya;
+     * halaman ini terbuka bagi siapa pun yang punya tiket + tanggal lahir,
+     * dan nama petugas tidak menambah apa pun pada pelacakan status.
+     *
+     * @return array<string, mixed>
+     */
+    private static function trackingStep(LetterRequestLog $log): array
+    {
+        $labels = LetterRequest::statusLabels();
+
+        return [
+            'id' => $log->id,
+            'to_status' => $log->to_status,
+            'to_label' => $labels[$log->to_status] ?? $log->to_status,
+            'step' => $log->step,
+            'note' => $log->note,
+            'at' => self::villageDateTime($log->created_at),
+        ];
+    }
+
+    /** "15 Oktober 2026, 14.32" pada kalender desa. */
+    private static function villageDateTime(?Carbon $moment): ?string
+    {
+        return $moment === null
+            ? null
+            : VillageTime::local($moment)->locale('id')->translatedFormat('d F Y, H.i');
+    }
+
+    /** "15 Oktober 2026" pada kalender desa. */
+    private static function villageDate(?Carbon $moment): ?string
+    {
+        return $moment === null
+            ? null
+            : VillageTime::local($moment)->locale('id')->translatedFormat('d F Y');
     }
 
     /** @return array<string, mixed> */

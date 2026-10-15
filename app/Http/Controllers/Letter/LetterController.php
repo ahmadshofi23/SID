@@ -19,7 +19,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Arsip & cetak surat terbit — FR-SRT-11, FR-SRT-12, FR-SRT-13.
+ * Arsip & cetak surat terbit — FR-SRT-11, FR-SRT-12.
  *
  * Tanpa konstruktor (KEP-009).
  */

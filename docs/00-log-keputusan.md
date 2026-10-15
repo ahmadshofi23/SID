@@ -461,3 +461,44 @@ prasyarat yang tanpanya pengajuan daring tidak punya pemilik yang terverifikasi.
 4. Keluaran kedua driver **wajib diperiksa dengan surat yang sama**: perbedaan tata
    letak antara mesin pengembang dan produksi adalah kelas bug yang hanya muncul
    setelah surat dicetak di kantor desa.
+
+## KEP-014 — Pelacakan status surat: publik, tetapi berfaktor dua
+**Tanggal:** 2026-10-16 · **Status:** Wajib · **Kategori:** keamanan, privasi
+
+**Masalah yang ditemukan:** FR-SRT-13/BR-11 meminta warga dapat memantau status
+pengajuan beserta alasan penolakan. Jalur termudah — halaman publik yang membuka
+pengajuan dari nomor tiket, seperti halaman verifikasi keaslian surat — TIDAK aman
+di sini. Nomor tiket berbentuk `T261015-C507E9`: tanggal pengajuan ditambah enam
+karakter acak, jadi ruang terkaannya kecil dan tanggalnya bukan rahasia. Kode
+verifikasi surat 32 karakter acak dan karena itu boleh berdiri sendiri (lihat
+`LetterRepository::findByVerificationCode()`); nomor tiket tidak. Halaman tiket-saja
+akan memungkinkan seseorang memetakan siapa mengajukan surat apa — termasuk SKTM,
+yang keberadaannya saja sudah menyatakan keadaan ekonomi sebuah keluarga.
+
+**Pilihan yang dipertimbangkan:** (a) mewajibkan login; (b) nomor tiket + faktor
+kedua milik pemohon.
+
+**Keputusan:**
+1. Dipilih **(b): nomor tiket + tanggal lahir pemohon**, keduanya menjadi bagian
+   KUERI (`LetterRequestRepository::findByTicketForTracking()`), bukan diperiksa
+   setelah barisnya dimuat. Login ditolak sebagai syarat karena akun warga baru ada
+   di Sprint 6 (KEP-013 §2), sementara pengajuan loket hari ini dibuat atas nama
+   warga yang belum punya akun — BR-11 akan menjadi fitur yang tidak dapat dipakai
+   siapa pun sampai sprint berikutnya.
+2. Tanggal lahir **bukan rahasia kuat** dan tidak diperlakukan sebagai rahasia: ia
+   hanya berlaku bersama tiket yang tepat, rutenya dibatasi `throttle:8,1` (lebih
+   ketat daripada `30,1` pada verifikasi surat), dan setiap kegagalan dicatat ke
+   audit log sebagai `letter.tracking_failed`.
+3. Kegagalan **tidak membedakan** "tiket tidak ada" dari "tanggal lahir salah".
+   Jawaban yang berbeda akan mengubah halaman ini menjadi alat untuk memastikan
+   sebuah nomor tiket memang terdaftar.
+4. Payload pelacakan ditulis **terpisah** dari `LetterRequestPresenter::detail()`
+   (`::tracking()`), bukan detail yang dipangkas: layar petugas akan terus
+   bertambah isinya, dan setiap tambahan di sana akan ikut terkirim ke halaman
+   publik tanpa ada yang meninjaunya. Yang dikirim: status, estimasi selesai,
+   riwayat waktu tiap tahap, alasan penolakan / catatan revisi, nama tersamar.
+   Yang tidak pernah dikirim: NIK (termasuk tersamar), isi formulir, alamat, dan
+   nama petugas pemeriksa.
+5. Saat akun warga tersedia di Sprint 6, halaman ini **tetap ada** sebagai "cek
+   resi" tanpa login; daftar pengajuan milik akun sendiri menjadi jalur kedua,
+   bukan pengganti.

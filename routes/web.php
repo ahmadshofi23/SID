@@ -10,6 +10,7 @@ use App\Http\Controllers\Letter\LetterAttachmentController;
 use App\Http\Controllers\Letter\LetterController;
 use App\Http\Controllers\Letter\LetterPdfController;
 use App\Http\Controllers\Letter\LetterRequestController;
+use App\Http\Controllers\Letter\LetterTrackingController;
 use App\Http\Controllers\Letter\LetterTypeController;
 use App\Http\Controllers\Letter\LetterVerificationController;
 use App\Http\Controllers\Population\AnomalyController;
@@ -40,6 +41,22 @@ Route::view('/', 'welcome')->name('home');
 Route::get('surat/verifikasi/{kode}', LetterVerificationController::class)
     ->middleware('throttle:30,1')
     ->name('surat.verifikasi');
+
+/* ------------------ Pelacakan status pengajuan (publik) -----------------
+ | TANPA otentikasi karena akun warga baru ada di Sprint 6 (KEP-013 §2),
+ | sementara pengajuan loket hari ini dibuat atas nama warga yang belum
+ | punya akun — BR-11 tidak dapat dipenuhi bila halaman ini meminta login.
+ |
+ | Gantinya: faktor kedua (tanggal lahir pemohon) dan laju yang LEBIH KETAT
+ | daripada verifikasi surat — nomor tiket `T261015-C507E9` hanya memuat enam
+ | karakter acak, jadi ia dapat dicoba-coba. Alasan lengkapnya ada di
+ | LetterTrackingController (KEP-014).
+ */
+Route::get('surat/lacak', [LetterTrackingController::class, 'show'])
+    ->name('surat.lacak');
+Route::post('surat/lacak', [LetterTrackingController::class, 'track'])
+    ->middleware('throttle:8,1')
+    ->name('surat.lacak.cari');
 
 /* --------------------------- Tamu (belum masuk) ------------------------- */
 Route::middleware('guest')->group(function (): void {

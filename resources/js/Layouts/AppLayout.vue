@@ -4,7 +4,7 @@ import { Link, router } from '@inertiajs/vue3'
 import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
     ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
-    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark,
+    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
@@ -82,6 +82,21 @@ const groups = computed<NavGroup[]>(() => [
               pattern: '/surat/ajukan', icon: FileCheck, show: can('surat.ajukan') },
             { label: 'Arsip Surat', route: '/surat/arsip',
               pattern: '/surat/arsip', icon: Archive, show: can('surat.lihat') },
+            /*
+             * Halaman warga, sengaja ikut di menu petugas.
+             *
+             * Warga menelepon kantor desa dengan menyebut nomor tiket, dan
+             * petugas loket perlu melihat persis apa yang dilihat warga di
+             * layarnya — termasuk kalimat alasan penolakannya. Membukanya
+             * dari antrean berarti petugas harus lebih dulu mencari
+             * pengajuannya, padahal yang ada di tangan hanya nomor tiket.
+             *
+             * Halaman ini di luar AppLayout (publik, tanpa lingkup), jadi
+             * petugas keluar dari panel saat membukanya; itu sebabnya ia
+             * menyediakan tautan kembali ke dasbor bagi yang sudah masuk.
+             */
+            { label: 'Lacak Pengajuan', route: '/surat/lacak',
+              pattern: '/surat/lacak', icon: Search, show: can('surat.lihat') },
             { label: 'Jenis Surat', route: '/jenis-surat',
               pattern: '/jenis-surat', icon: Settings2, show: can('jenis_surat.lihat') },
         ],

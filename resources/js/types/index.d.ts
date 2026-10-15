@@ -202,6 +202,50 @@ export interface LetterRequestLog {
     created_at: string
 }
 
+/**
+ * Satu tahap pada riwayat waktu halaman pelacakan publik.
+ *
+ * Tanpa `actor_name`: nama petugas pemeriksa sengaja tidak dikirim ke
+ * halaman yang dapat dibuka siapa pun yang punya tiket + tanggal lahir.
+ */
+export interface LetterTrackingStep {
+    id: string
+    to_status: LetterRequestStatus
+    to_label: string
+    step: number | null
+    note: string | null
+    /** Sudah diformat server pada kalender desa — jangan diformat ulang. */
+    at: string
+}
+
+/**
+ * Pelacakan status pengajuan untuk warga — FR-SRT-13, BR-11.
+ *
+ * Sengaja TIDAK memperluas LetterRequestRow: baris itu memuat NIK tersamar
+ * dan isian formulir, dan halaman pelacakan tidak boleh ikut berubah setiap
+ * kali layar petugas ditambahi data.
+ */
+export interface LetterRequestTracking {
+    ticket_number: string
+    status: LetterRequestStatus
+    status_label: string
+    letter_type: string
+    /** Tersamar, mis. "Siti A***** R*****". */
+    resident_name: string
+    current_step: number
+    step_total: number
+    is_open: boolean
+    is_overdue: boolean
+    submitted_at: string | null
+    due_at: string | null
+    completed_at: string | null
+    rejection_reason: string | null
+    revision_note: string | null
+    timeline: LetterTrackingStep[]
+    letter_number: string | null
+    issued_at: string | null
+}
+
 export interface LetterRequestRow {
     id: string
     ticket_number: string

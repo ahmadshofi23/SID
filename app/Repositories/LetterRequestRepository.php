@@ -121,6 +121,48 @@ final class LetterRequestRepository extends GuardedRepository
         return $this->scoped()->where('ticket_number', $ticket)->first();
     }
 
+    /**
+     * Pelacakan status oleh warga — SENGAJA TANPA LINGKUP (FR-SRT-13, BR-11).
+     *
+     * MENGAPA TANPA LINGKUP: pemohon yang dilayani di loket (`walk_in`) tidak
+     * punya akun sampai Sprint 6, sehingga tidak ada AccessScope apa pun yang
+     * dapat mewakili dirinya. Menyaring di sini berarti BR-11 ("warga dapat
+     * memantau status pengajuan") tidak dapat dipenuhi sama sekali bagi
+     * mayoritas pemohon hari ini.
+     *
+     * MENGAPA DUA FAKTOR, BUKAN NOMOR TIKET SAJA: nomor tiket berbentuk
+     * `T261015-C507E9` — tanggal ditambah enam karakter acak. Itu dapat
+     * dicoba-coba, berbeda dari kode verifikasi surat yang 32 karakter
+     * (lihat LetterRepository::findByVerificationCode()). Karena itu tanggal
+     * lahir pemohon ikut menjadi bagian KUERI, bukan diperiksa setelah
+     * barisnya dimuat: dengan begitu tiket benar + tanggal lahir salah sama
+     * sekali tidak pernah memuat pengajuan siapa pun, dan tidak ada jalan
+     * untuk membedakan "tiket tidak ada" dari "tanggal lahir salah".
+     *
+     * Yang membatasi sisanya ada di luar sini: pembatasan laju pada rutenya
+     * dan LetterTrackingController yang hanya mengirim ringkasan + riwayat
+     * waktu — tanpa NIK dan tanpa isi formulir.
+     *
+     * @param  string  $birthDate  Tanggal lahir pemohon, format Y-m-d.
+     */
+    public function findByTicketForTracking(string $ticket, string $birthDate): ?LetterRequest
+    {
+        return LetterRequest::query()
+            ->with([
+                // Seluruh kolom jenis surat, bukan sebagian: jumlah tahap
+                // pemeriksaan dibaca dari `approval_flow`, dan pemilihan
+                // kolom yang hemat di sini membuat verificationStepCount()
+                // gagal pada null.
+                'letterType',
+                'resident:id,full_name,birth_date',
+                'logs',
+                'letter:id,request_id,letter_number,issued_at',
+            ])
+            ->where('ticket_number', $ticket)
+            ->whereHas('resident', fn (Builder $q): Builder => $q->where('birth_date', $birthDate))
+            ->first();
+    }
+
     /** Jumlah per status, untuk kartu ringkasan di dasbor. */
     /** @return array<string, int> */
     public function countByStatus(): array

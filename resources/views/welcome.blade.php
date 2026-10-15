@@ -29,10 +29,20 @@
             (docs/11-roadmap-estimasi.md §2).
         </x-alert>
 
-        <div class="text-center">
+        <div class="flex flex-col items-center gap-3 text-center">
             <a href="{{ route('login') }}"
                class="touch-target inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 font-medium text-content-inverse transition-colors hover:bg-accent-hover">
                 Masuk ke sistem
+            </a>
+
+            {{--
+              Satu-satunya pintu warga ke sistem ini sampai portal publik
+              dibangun di Sprint 6: tanpa tautan ini, halaman pelacakan hanya
+              dapat dibuka oleh yang mengetahui URL-nya (FR-SRT-13, BR-11).
+            --}}
+            <a href="{{ route('surat.lacak') }}"
+               class="touch-target inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium text-accent transition-colors hover:underline">
+                Lacak status pengajuan surat
             </a>
         </div>
     </div>
