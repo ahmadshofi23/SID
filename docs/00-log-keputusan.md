@@ -572,3 +572,65 @@ terbit; (b) tawaran tanpa status, dihitung dari ada-tidaknya mutasi;
 9. Surat yang **dibatalkan** tidak dapat lagi menjadi dasar mutasi (RULE-05):
    tanpa pagar ini, surat yang dibatalkan justru karena datanya keliru masih
    dapat dipakai mengubah status penduduk.
+
+---
+
+## KEP-016 — Portal publik dirender Blade, bukan Inertia/Vue
+**Tanggal:** 2026-10-18 · **Status:** Wajib · **Kategori:** arsitektur, kinerja
+
+**Masalah yang ditemukan:** KEP-008 memindahkan panel administrasi ke Vue 3 +
+Inertia, dan dua halaman publik yang lebih dulu ada (verifikasi keaslian surat
+dan pelacakan status) ikut dibangun dengan Inertia. Saat portal publik mulai
+dikerjakan, dua ketentuan yang selama ini belum pernah diuji menjadi mengikat
+sekaligus: `docs/07 §7` mewajibkan halaman portal **berfungsi tanpa
+JavaScript** (*progressive enhancement*), dan `docs/07 §8` menetapkan LCP
+≤ 2,5 detik pada 4G dengan transfer pertama ≤ 500 KB (NFR-PERF-03/04).
+Inertia yang dirender di peramban tidak dapat memenuhi keduanya: tanpa
+JavaScript halamannya kosong — bukan sekadar kurang rupawan — dan paket Vue
+saja sudah memakan sebagian besar anggaran 500 KB sebelum satu kata pun dari
+isi desa ikut terkirim.
+
+**Pilihan yang dipertimbangkan:** (a) Inertia seperti panel, menerima halaman
+kosong tanpa JS; (b) Inertia + SSR; (c) Blade yang dirender server.
+
+**Keputusan:**
+1. Dipilih **(c)**. Portal publik — beranda, profil, pemerintahan, wilayah,
+   layanan, statistik, kontak — dirender Blade dan tidak memuat satu berkas
+   JavaScript pun. Isinya sudah utuh pada HTML pertama.
+2. **(b) ditolak.** Inertia SSR memperbaiki keduanya, tetapi menuntut satu
+   proses Node berjalan terus di produksi, dipantau, dan dihidupkan ulang
+   bila mati. Sistem ini harus dapat dirawat perangkat desa setelah serah
+   terima (docs/01 §6) — alasan yang sama yang melahirkan KEP-005 dan membuat
+   KEP-007 menyarankan Vue hanya pada layar yang membutuhkannya. Portal yang
+   seluruhnya teks dan tabel adalah justru layar yang **tidak** membutuhkannya.
+3. **(a) ditolak** karena bukan penurunan mutu yang anggun melainkan kegagalan
+   total: pengunjung dengan JS gagal dimuat melihat halaman putih di situs
+   resmi desanya. Pada jaringan desa itu bukan kemungkinan teoretis.
+4. Gayanya tetap **satu sumber**: Blade memakai `resources/css/app.css` yang
+   sama dengan panel. Padanan Blade dibuat hanya untuk komponen yang memang
+   dipakai portal (sudah ada `<x-alert>`), bukan menyalin seluruh pustaka Vue.
+   Ikon digambar sebagai SVG sebaris; portal tidak memuat paket ikon.
+5. **Batasnya jelas:** halaman publik yang berupa FORMULIR dengan keadaan
+   validasi — verifikasi keaslian surat dan pelacakan status — tetap Inertia
+   dan tidak ditulis ulang. Keduanya sudah berjalan dan berujinya lengkap,
+   bukan halaman yang dituju mesin pencari, dan menulis ulang kode yang sudah
+   benar bukan pekerjaan gratis. Yang mengikat adalah arahnya: halaman portal
+   **baru** dibangun dengan Blade.
+6. Portal punya kerangka `<head>` **sendiri**, terpisah dari `app.blade.php`.
+   Akar Inertia memasang `noindex, nofollow` untuk seluruh panel administrasi;
+   portal justru harus terindeks (FR-PRT-08). Memakai satu akar untuk keduanya
+   berarti satu baris meta yang menentukan apakah situs desa muncul di mesin
+   pencari atau tidak — dan baris itu akan berubah karena alasan yang tidak ada
+   hubungannya dengan portal.
+7. `sitemap.xml` dan `robots.txt` **dibangkitkan**, bukan berkas statis di
+   `public/`: daftar layanan berubah dari panel petugas tanpa rilis baru, dan
+   baris `Sitemap:` menuntut URL absolut yang tidak diketahui sebuah berkas
+   statis. `PublicPortalTest` menjaga agar panel administrasi dan halaman
+   pelacakan tidak pernah masuk ke peta situs.
+
+**Konsekuensi yang diterima:** "statistik interaktif" pada FR-PRT-05 menjadi
+grafik batang CSS dengan tabel angka di bawahnya, bukan grafik yang dapat
+disaring di peramban. Penyaringan per wilayah memang tidak dikehendaki di
+halaman publik (ADR-008, lihat §3 keterangan di `portal/statistik.blade.php`),
+sehingga yang hilang hanyalah animasi — sementara yang didapat adalah halaman
+yang terbaca pembaca layar dan tetap hidup tanpa JavaScript.

@@ -21,6 +21,8 @@ use App\Http\Controllers\Population\MutationController;
 use App\Http\Controllers\Population\RegionController;
 use App\Http\Controllers\Population\ResidentController;
 use App\Http\Controllers\Population\StatisticsController;
+use App\Http\Controllers\Portal\PortalController;
+use App\Http\Controllers\Portal\SitemapController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -32,7 +34,34 @@ use Inertia\Inertia;
 | dan kadang mengetikkan URL ini (NFR-USA-01).
 */
 
-Route::view('/', 'welcome')->name('home');
+/* ---------------------------- Portal publik ----------------------------
+ | TANPA otentikasi: inilah muka desa bagi warga dan instansi lain
+ | (docs/03 §2.1, BR-20). Dirender Blade, bukan Inertia — docs/07 §7
+ | mewajibkan halaman portal berfungsi tanpa JavaScript dan §8 membatasi
+ | transfer awal 500 KB; alasan lengkapnya di KEP-016.
+ |
+ | Yang menjaga rute-rute ini bukan middleware melainkan PILIHAN SUMBER
+ | DATA: statistik dibaca dari tabel ringkasan `population_stats`, perangkat
+ | desa dari `officials`, dan tidak satu pun menyentuh `residents`.
+ */
+Route::controller(PortalController::class)->group(function (): void {
+    Route::get('/', 'home')->name('portal.beranda');
+    Route::get('profil', 'profil')->name('portal.profil');
+    Route::get('profil/wilayah', 'wilayah')->name('portal.wilayah');
+    Route::get('profil/pemerintahan', 'pemerintahan')->name('portal.pemerintahan');
+    Route::get('layanan', 'layanan')->name('portal.layanan');
+    Route::get('layanan/{kode}', 'layananDetail')->name('portal.layanan.detail');
+    Route::get('statistik', 'statistik')->name('portal.statistik');
+    Route::get('kontak', 'kontak')->name('portal.kontak');
+});
+
+/*
+ | Peta situs & robots dibangkitkan, bukan berkas statis: daftar layanan
+ | berubah dari panel petugas, dan baris `Sitemap:` menuntut URL absolut yang
+ | tidak diketahui berkas di public/. Lihat SitemapController.
+ */
+Route::get('sitemap.xml', [SitemapController::class, 'sitemap'])->name('portal.sitemap');
+Route::get('robots.txt', [SitemapController::class, 'robots'])->name('portal.robots');
 
 /* ------------------------ Verifikasi surat (publik) ---------------------
  | TANPA otentikasi: dipakai bank, sekolah, dan kantor kecamatan yang
