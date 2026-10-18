@@ -32,6 +32,9 @@ final class SitemapController extends Controller
     private const STATIC_PAGES = [
         ['route' => 'portal.beranda', 'priority' => '1.0', 'changefreq' => 'weekly'],
         ['route' => 'portal.layanan', 'priority' => '0.9', 'changefreq' => 'monthly'],
+        ['route' => 'portal.berita', 'priority' => '0.8', 'changefreq' => 'weekly'],
+        ['route' => 'portal.pengumuman', 'priority' => '0.8', 'changefreq' => 'weekly'],
+        ['route' => 'portal.agenda', 'priority' => '0.7', 'changefreq' => 'weekly'],
         ['route' => 'portal.layanan.detail', 'priority' => '0.8', 'changefreq' => 'monthly'],
         ['route' => 'portal.profil', 'priority' => '0.7', 'changefreq' => 'yearly'],
         ['route' => 'portal.pemerintahan', 'priority' => '0.7', 'changefreq' => 'yearly'],
@@ -62,6 +65,21 @@ final class SitemapController extends Controller
                 'loc' => route($page['route']),
                 'priority' => $page['priority'],
                 'changefreq' => $page['changefreq'],
+            ];
+        }
+
+        /*
+         * Tulisan yang BELUM waktunya terbit tidak masuk peta situs: saringan
+         * publishedForSitemap() adalah Post::scopePublished() yang sama dengan
+         * halaman publik. Memisahkannya akan membuat peta situs mengundang
+         * perayap ke pengumuman yang sengaja dijadwalkan untuk besok.
+         */
+        foreach ($portal->publishedForSitemap() as $tulisan) {
+            $urls[] = [
+                'loc' => route('portal.tulisan', [$tulisan->type, $tulisan->slug]),
+                'priority' => '0.6',
+                'changefreq' => 'monthly',
+                'lastmod' => $tulisan->updated_at->toAtomString(),
             ];
         }
 

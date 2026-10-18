@@ -79,6 +79,33 @@
         @endif
     </section>
 
+    {{-- ====================== Berita & pengumuman ========================= --}}
+    @if ($tulisanTerbaru->isNotEmpty())
+        {{--
+          Diletakkan SETELAH layanan, bukan sebelumnya. docs/07 §5.5: warga
+          datang ke situs desa untuk mengurus sesuatu, bukan membaca berita.
+          Blok ini hilang sama sekali bila belum ada yang terbit — kerangka
+          kosong bertuliskan "belum ada berita" di halaman depan membuat situs
+          desa terlihat telantar.
+        --}}
+        <section class="border-t border-line bg-surface" aria-labelledby="judul-kabar">
+            <div class="mx-auto max-w-5xl px-4 py-10">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                    <h2 id="judul-kabar" class="text-xl font-semibold">Kabar Desa</h2>
+                    <a href="{{ route('portal.berita') }}" class="text-sm font-medium text-accent hover:underline">
+                        Semua berita &rarr;
+                    </a>
+                </div>
+
+                <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($tulisanTerbaru as $satu)
+                        <li><x-portal.kartu-tulisan :tulisan="$satu" /></li>
+                    @endforeach
+                </ul>
+            </div>
+        </section>
+    @endif
+
     {{-- ======================= Desa dalam angka =========================== --}}
     <section class="border-y border-line bg-surface" aria-labelledby="judul-angka">
         <div class="mx-auto max-w-5xl px-4 py-10">

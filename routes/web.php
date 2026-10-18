@@ -22,6 +22,7 @@ use App\Http\Controllers\Population\RegionController;
 use App\Http\Controllers\Population\ResidentController;
 use App\Http\Controllers\Population\StatisticsController;
 use App\Http\Controllers\Portal\PortalController;
+use App\Http\Controllers\Portal\PostController;
 use App\Http\Controllers\Portal\SitemapController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -53,6 +54,19 @@ Route::controller(PortalController::class)->group(function (): void {
     Route::get('layanan/{kode}', 'layananDetail')->name('portal.layanan.detail');
     Route::get('statistik', 'statistik')->name('portal.statistik');
     Route::get('kontak', 'kontak')->name('portal.kontak');
+
+    /*
+     | Konten portal (FR-PRT-02/03). Satu rute detail untuk ketiga jenis,
+     | dengan jenisnya terikat pada ruas URL: pengumuman yang dibuka lewat
+     | /berita/{slug} menghasilkan 404, supaya satu tulisan hanya punya satu
+     | alamat yang dapat dibagikan dan diindeks.
+     */
+    Route::get('berita', 'berita')->name('portal.berita');
+    Route::get('pengumuman', 'pengumuman')->name('portal.pengumuman');
+    Route::get('agenda', 'agenda')->name('portal.agenda');
+    Route::get('{jenis}/{slug}', 'tulisan')
+        ->whereIn('jenis', ['berita', 'pengumuman', 'agenda'])
+        ->name('portal.tulisan');
 });
 
 /*
@@ -300,6 +314,28 @@ Route::middleware('auth')->group(function (): void {
     });
 
     /* ------------------------ Jenis surat & template --------------------- */
+    /* ------------------- Konten portal (Sprint 6) ----------------------
+     | Tiga izin berbeda, sesuai matriks RBAC docs/03 §4.9 baris "Konten
+     | portal": `portal.lihat` (Kepala Desa & Pengawas berhenti di sini),
+     | `portal.kelola` (menyunting), dan `portal.terbitkan` yang TIDAK
+     | dipasang sebagai middleware rute — rutenya sama untuk menyimpan draf
+     | dan menerbitkan, jadi pemeriksaannya ada di PostController.
+     */
+    Route::prefix('portal/konten')->group(function (): void {
+        Route::get('/', [PostController::class, 'index'])
+            ->middleware('izin:portal.lihat')->name('portal-konten.index');
+        Route::get('tambah', [PostController::class, 'create'])
+            ->middleware('izin:portal.kelola')->name('portal-konten.create');
+        Route::post('/', [PostController::class, 'store'])
+            ->middleware('izin:portal.kelola')->name('portal-konten.store');
+        Route::get('{id}/ubah', [PostController::class, 'edit'])
+            ->middleware('izin:portal.kelola')->name('portal-konten.edit');
+        Route::post('{id}', [PostController::class, 'update'])
+            ->middleware('izin:portal.kelola')->name('portal-konten.update');
+        Route::delete('{id}', [PostController::class, 'destroy'])
+            ->middleware('izin:portal.kelola')->name('portal-konten.destroy');
+    });
+
     Route::prefix('jenis-surat')->group(function (): void {
         Route::get('/', [LetterTypeController::class, 'index'])
             ->middleware('izin:jenis_surat.lihat')->name('jenis-surat.index');

@@ -6,9 +6,11 @@ namespace App\Services\Portal;
 
 use App\Models\LetterType;
 use App\Models\Official;
+use App\Models\Post;
 use App\Models\Region;
 use App\Repositories\FamilyRepository;
 use App\Services\Population\StatisticsService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -97,6 +99,93 @@ final class PortalService
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Konten portal yang BOLEH dilihat publik, satu jenis.
+     *
+     * Saringannya satu-satunya: Post::scopePublished(). Tidak ada varian lain
+     * di mana pun — pengumuman yang dijadwalkan untuk besok tidak boleh bocor
+     * hari ini hanya karena satu halaman menyusun kuerinya sendiri.
+     *
+     * @return LengthAwarePaginator<int, Post>
+     */
+    public function publishedOfType(string $type, int $perPage = 12): LengthAwarePaginator
+    {
+        return Post::query()
+            ->published()
+            ->ofType($type)
+            ->orderByDesc('published_at')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Agenda kegiatan, dipisah menjadi mendatang dan sudah lewat.
+     *
+     * Diurutkan MENAIK untuk yang mendatang: yang paling dekat adalah yang
+     * paling berguna. Mengurutkannya menurun seperti berita akan menaruh
+     * kegiatan tahun depan di atas rapat besok.
+     *
+     * @return array{mendatang: Collection<int, Post>, lewat: Collection<int, Post>}
+     */
+    public function agenda(int $limitLewat = 10): array
+    {
+        $batas = now();
+
+        return [
+            'mendatang' => Post::query()
+                ->published()
+                ->ofType(Post::TYPE_AGENDA)
+                ->where(fn ($q) => $q
+                    ->where('event_end_at', '>=', $batas)
+                    ->orWhere(fn ($i) => $i->whereNull('event_end_at')->where('event_start_at', '>=', $batas)))
+                ->orderBy('event_start_at')
+                ->get(),
+            'lewat' => Post::query()
+                ->published()
+                ->ofType(Post::TYPE_AGENDA)
+                ->where(fn ($q) => $q
+                    ->where('event_end_at', '<', $batas)
+                    ->orWhere(fn ($i) => $i->whereNull('event_end_at')->where('event_start_at', '<', $batas)))
+                ->orderByDesc('event_start_at')
+                ->limit($limitLewat)
+                ->get(),
+        ];
+    }
+
+    /** Satu tulisan dari slug-nya; null bila belum/tidak terbit. */
+    public function findPublished(string $slug): ?Post
+    {
+        return Post::query()->published()->where('slug', $slug)->first();
+    }
+
+    /**
+     * Tulisan terbaru untuk beranda — berita dan pengumuman bercampur.
+     *
+     * Dicampur dengan sengaja: warga yang membuka halaman depan ingin tahu
+     * "apa yang baru di desa", dan pembedaan berita/pengumuman adalah
+     * kategori administrasi, bukan cara mereka membacanya.
+     *
+     * @return Collection<int, Post>
+     */
+    public function latestForHome(int $limit = 3): Collection
+    {
+        return Post::query()
+            ->published()
+            ->whereIn('type', [Post::TYPE_BERITA, Post::TYPE_PENGUMUMAN])
+            ->orderByDesc('published_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /** Seluruh tulisan terbit, untuk peta situs. */
+    /** @return Collection<int, Post> */
+    public function publishedForSitemap(): Collection
+    {
+        return Post::query()
+            ->published()
+            ->orderByDesc('published_at')
+            ->get(['id', 'type', 'slug', 'published_at', 'updated_at']);
     }
 
     /**

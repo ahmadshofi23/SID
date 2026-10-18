@@ -4,7 +4,7 @@ import { Link, router } from '@inertiajs/vue3'
 import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
     ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
-    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search,
+    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search, Newspaper, Globe,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
@@ -99,6 +99,20 @@ const groups = computed<NavGroup[]>(() => [
               pattern: '/surat/lacak', icon: Search, show: can('surat.lihat') },
             { label: 'Jenis Surat', route: '/jenis-surat',
               pattern: '/jenis-surat', icon: Settings2, show: can('jenis_surat.lihat') },
+        ],
+    },
+    {
+        label: 'Portal Desa',
+        items: [
+            { label: 'Konten Portal', route: '/portal/konten',
+              pattern: '/portal/konten', icon: Newspaper, show: can('portal.lihat') },
+            /*
+             * Tautan ke portal publik, sengaja ada di menu petugas: yang
+             * menulis berita harus dapat melihat hasilnya seperti yang dilihat
+             * warga, bukan hanya pratinjau di dalam panel.
+             */
+            { label: 'Lihat Portal Publik', route: '/',
+              pattern: '/portal-publik', icon: Globe, show: can('portal.lihat') },
         ],
     },
     {

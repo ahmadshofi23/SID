@@ -40,6 +40,9 @@
         ['label' => 'Beranda', 'route' => 'portal.beranda'],
         ['label' => 'Profil', 'route' => 'portal.profil'],
         ['label' => 'Pemerintahan', 'route' => 'portal.pemerintahan'],
+        ['label' => 'Berita', 'route' => 'portal.berita'],
+        ['label' => 'Pengumuman', 'route' => 'portal.pengumuman'],
+        ['label' => 'Agenda', 'route' => 'portal.agenda'],
         ['label' => 'Layanan', 'route' => 'portal.layanan'],
         ['label' => 'Statistik', 'route' => 'portal.statistik'],
         ['label' => 'Kontak', 'route' => 'portal.kontak'],
@@ -124,7 +127,7 @@
             </span>
         </a>
 
-        <nav class="ml-auto hidden md:block" aria-label="Navigasi utama">
+        <nav class="ml-auto hidden lg:block" aria-label="Navigasi utama">
             <ul class="flex items-center gap-1">
                 @foreach ($menu as $item)
                     <li>
@@ -147,7 +150,7 @@
           Elemen ini membuka-menutup sendiri di peramban, jadi navigasi portal
           tetap hidup walau berkas JS gagal dimuat (docs/07 §7).
         --}}
-        <details class="relative ml-auto md:hidden">
+        <details class="relative ml-auto lg:hidden">
             <summary class="touch-target flex cursor-pointer list-none items-center justify-center rounded-lg px-3 text-content-secondary hover:bg-surface-hover">
                 <span class="sr-only">Buka menu</span>
                 <svg class="size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"

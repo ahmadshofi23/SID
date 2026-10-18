@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Models\Post;
 use App\Repositories\FamilyRepository;
 use App\Services\Population\StatisticsService;
 use App\Services\Portal\PortalService;
@@ -37,6 +38,7 @@ final class PortalController extends Controller
             'layanan' => $layanan->take(6),
             'jumlahLayanan' => $layanan->count(),
             'angka' => $portal->villageInNumbers($statistics, $families),
+            'tulisanTerbaru' => $portal->latestForHome(),
         ]);
     }
 
@@ -102,5 +104,54 @@ final class PortalController extends Controller
     public function kontak(): View
     {
         return view('portal.kontak');
+    }
+
+    /* ======================= Konten portal (Bagian 2) ====================== */
+
+    public function berita(PortalService $portal): View
+    {
+        return view('portal.tulisan-daftar', [
+            'jenis' => Post::TYPE_BERITA,
+            'tulisan' => $portal->publishedOfType(Post::TYPE_BERITA),
+        ]);
+    }
+
+    public function pengumuman(PortalService $portal): View
+    {
+        return view('portal.tulisan-daftar', [
+            'jenis' => Post::TYPE_PENGUMUMAN,
+            'tulisan' => $portal->publishedOfType(Post::TYPE_PENGUMUMAN),
+        ]);
+    }
+
+    public function agenda(PortalService $portal): View
+    {
+        return view('portal.agenda', $portal->agenda());
+    }
+
+    /**
+     * Satu tulisan. `$jenis` berasal dari RUAS URL, bukan dari barisnya.
+     *
+     * Pengumuman yang dibuka lewat /berita/{slug} menghasilkan 404, bukan
+     * halaman yang sama dengan remah roti keliru: satu tulisan harus punya
+     * satu alamat, kalau tidak mesin pencari mengindeksnya berkali-kali dan
+     * tautan yang dibagikan warga menunjuk ke tempat yang berbeda-beda.
+     */
+    public function tulisan(string $jenis, string $slug, PortalService $portal): View
+    {
+        $tulisan = $portal->findPublished($slug);
+
+        abort_if($tulisan === null || $tulisan->type !== $jenis, 404);
+
+        /*
+         * Penghitung dibaca sebagai PERKIRAAN, bukan statistik: ia naik pada
+         * setiap pemuatan termasuk oleh perayap, dan tidak pernah dipakai
+         * untuk keputusan apa pun. increment() menulis langsung ke basis data
+         * tanpa membangkitkan event model, sehingga tidak mengubah updated_at
+         * dan tidak memindahkan tulisan ke puncak layar petugas.
+         */
+        $tulisan->increment('view_count');
+
+        return view('portal.tulisan', ['tulisan' => $tulisan]);
     }
 }
