@@ -37,6 +37,19 @@
                     Lacak Status Pengajuan
                 </a>
             </div>
+
+            {{--
+              Pendaftaran akun diletakkan sebagai baris ketiga, bukan tombol
+              besar: warga yang datang untuk mengurus satu surat tidak boleh
+              merasa wajib membuat akun lebih dulu — loket tetap terbuka.
+            --}}
+            <p class="mt-4 text-sm text-content-secondary">
+                Ingin mengurus surat dari rumah?
+                <a href="{{ route('daftar') }}" class="font-medium text-accent hover:underline">
+                    Daftar akun warga
+                </a>
+                — gratis, diperiksa petugas desa satu hari kerja.
+            </p>
         </div>
     </section>
 

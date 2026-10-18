@@ -634,3 +634,67 @@ disaring di peramban. Penyaringan per wilayah memang tidak dikehendaki di
 halaman publik (ADR-008, lihat §3 keterangan di `portal/statistik.blade.php`),
 sehingga yang hilang hanyalah animasi — sementara yang didapat adalah halaman
 yang terbaca pembaca layar dan tetap hidup tanpa JavaScript.
+
+---
+
+## KEP-017 — Pendaftaran warga: satu jawaban untuk semua hasil
+**Tanggal:** 2026-10-18 · **Status:** Wajib · **Kategori:** keamanan, privasi
+
+**Masalah yang ditemukan:** FR-AUT-08 meminta pendaftaran warga mencocokkan
+NIK + nomor KK + nama ke data penduduk, dan FR-AUT-10 melarang sistem
+mengungkap apakah suatu NIK terdaftar. Keduanya bertabrakan pada hal yang
+paling lumrah di setiap formulir pendaftaran: pesan galat yang menolong.
+"NIK tidak ditemukan", "NIK ini sudah punya akun", dan "email sudah dipakai"
+masing-masing menjawab pertanyaan yang tidak berhak ditanyakan orang asing.
+NIK berpola — enam digit pertamanya kode wilayah, enam berikutnya tanggal
+lahir — sehingga ruang tebakannya jauh lebih kecil daripada enam belas digit
+acak. Formulir yang membedakan jawabannya karena itu bukan sekadar bocor
+sedikit: ia dapat dipakai menyusun daftar penduduk desa, lengkap dengan
+tanggal lahirnya, tanpa pernah masuk ke sistem.
+
+**Pilihan yang dipertimbangkan:** (a) pesan galat spesifik, dengan pembatasan
+laju sebagai satu-satunya pagar; (b) satu jawaban seragam untuk semua hasil;
+(c) verifikasi lewat OTP ke nomor ponsel lebih dulu, baru pencocokan.
+
+**Keputusan:**
+1. Dipilih **(b)**. Setiap pengiriman formulir berakhir di halaman
+   `daftar/terkirim` yang sama persis — cocok, tidak cocok, penduduk sudah
+   punya akun, atau kontak sudah dipakai. `CitizenRegistrationService::register()`
+   karena itu tidak mengembalikan apa pun dan tidak melempar pengecualian
+   untuk ketidakcocokan.
+2. **Harga yang dibayar diakui, dan dibayar di tempat lain.** Warga yang salah
+   mengetik satu huruf namanya akan menunggu tanpa tahu apa yang keliru. Maka
+   halaman konfirmasi WAJIB memuat jalan keluar untuk setiap kemungkinan:
+   tautan atur ulang kata sandi bagi yang mungkin sudah punya akun, dan ajakan
+   datang ke kantor desa membawa KTP dan KK bagi yang datanya tidak cocok.
+   Halaman itu bagian dari keputusan ini, bukan hiasan — tanpanya pilihan (b)
+   memindahkan beban ke warga dan berhenti di situ.
+3. **Yang TETAP dijawab terang** adalah galat tentang data pemohon sendiri:
+   kata sandi terlalu pendek, email dan nomor ponsel dua-duanya kosong, foto
+   KTP bukan gambar. Tak satu pun menyatakan apa pun tentang warga lain, dan
+   membungkamnya hanya membuat formulir terasa rusak.
+4. Pencocokan menuntut **ketiganya cocok** dan penduduknya **aktif** (RULE-03).
+   NIK saja tidak cukup: ia beredar di fotokopi KTP yang tertinggal di mana-
+   mana, sedangkan nomor KK beserta ejaan nama adalah dua hal yang praktis
+   hanya diketahui orang di dalam keluarga itu.
+5. Pencocokan **mengabaikan lingkup akses** (`findByNikIgnoringScope`), dan
+   memang harus: pemohon adalah tamu tanpa AccessScope sama sekali. Yang
+   menjaga keamanannya bukan lingkup melainkan tiga syarat serentak di atas,
+   ditambah `throttle:5,60` pada rutenya.
+6. Percobaan yang tidak cocok dicatat sebagai `citizen.registration_unmatched`
+   dengan **NIK ter-hash**, bukan terbaca. Petugas dapat melihat ada berapa
+   banyak percobaan gagal dan mengenali pola percobaan berurutan; audit log
+   tidak menjadi tempat penyimpanan NIK baru di luar tabel penduduk.
+7. **(c) ditolak** untuk Fase 1: pengiriman OTP menuntut layanan SMS/WhatsApp
+   berbayar, yang dilarang docs/03 §2.4 pada MVP, dan menutup warga yang
+   mendaftar dengan email saja.
+8. **Foto KTP dihapus begitu petugas memutuskan**, disetujui maupun ditolak.
+   Ia hanya diperlukan untuk satu keputusan, dan keputusan itu sudah diambil.
+   Menyimpannya "untuk jaga-jaga" berarti desa memelihara arsip foto KTP
+   seluruh warganya — sasaran yang lebih berharga bagi penyerang daripada
+   basis datanya sendiri, dan tidak diminta satu pun kebutuhan (docs/08 §3).
+9. Verifikasi dijaga `pengguna.verifikasi`, yang pada matriks RBAC hanya
+   dimiliki Admin Desa, dan rutenya menolak akun yang bukan warga menunggu
+   verifikasi dengan **404**. Tanpa pagar itu, rute ini menjadi cara
+   mengaktifkan akun apa pun yang kebetulan berstatus menunggu — termasuk
+   akun petugas yang sengaja dinonaktifkan.

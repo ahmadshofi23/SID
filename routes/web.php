@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\Citizen\CitizenVerificationController;
+use App\Http\Controllers\Citizen\RegistrationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Letter\LetterAttachmentController;
 use App\Http\Controllers\Letter\LetterController;
@@ -113,6 +115,21 @@ Route::middleware('guest')->group(function (): void {
     Route::post('masuk/dua-faktor/{challenge}', [TwoFactorController::class, 'verifyChallenge'])
         ->middleware('throttle:10,1')
         ->name('two-factor.verify');
+
+    /* ---------------------- Pendaftaran akun warga ---------------------
+     | FR-AUT-08/09/10, UC-15. Prasyarat pengajuan surat daring (KEP-013 §2).
+     |
+     | Laju dibatasi KETAT (5 per jam per IP): formulir ini mencocokkan NIK
+     | ke data penduduk, sehingga tanpa pagar laju ia dapat dipakai menebak
+     | NIK berurutan. Jawabannya memang selalu sama (KEP-017), tetapi
+     | pembatasan laju menutup pengukuran waktu dan percobaan massal.
+     */
+    Route::get('daftar', [RegistrationController::class, 'show'])->name('daftar');
+    Route::post('daftar', [RegistrationController::class, 'store'])
+        ->middleware('throttle:5,60')
+        ->name('daftar.store');
+    Route::get('daftar/terkirim', [RegistrationController::class, 'sent'])
+        ->name('daftar.terkirim');
 
     Route::get('lupa-sandi', [PasswordResetController::class, 'showRequestForm'])
         ->name('password.request');
@@ -314,6 +331,24 @@ Route::middleware('auth')->group(function (): void {
     });
 
     /* ------------------------ Jenis surat & template --------------------- */
+    /* ---------------- Verifikasi akun warga (Sprint 6) -----------------
+     | FR-AUT-09, UC-15. Izin `pengguna.verifikasi` — pada matriks RBAC
+     | hanya Admin Desa: menyetujui satu akun warga sama beratnya dengan
+     | mengubah data kependudukan, bukan pekerjaan loket.
+     */
+    Route::prefix('pengaturan/verifikasi-warga')
+        ->middleware('izin:pengguna.verifikasi')
+        ->group(function (): void {
+            Route::get('/', [CitizenVerificationController::class, 'index'])
+                ->name('verifikasi-warga.index');
+            Route::get('{id}/dokumen', [CitizenVerificationController::class, 'document'])
+                ->name('verifikasi-warga.dokumen');
+            Route::post('{id}/setujui', [CitizenVerificationController::class, 'approve'])
+                ->name('verifikasi-warga.setujui');
+            Route::post('{id}/tolak', [CitizenVerificationController::class, 'reject'])
+                ->name('verifikasi-warga.tolak');
+        });
+
     /* ------------------- Konten portal (Sprint 6) ----------------------
      | Tiga izin berbeda, sesuai matriks RBAC docs/03 §4.9 baris "Konten
      | portal": `portal.lihat` (Kepala Desa & Pengawas berhenti di sini),

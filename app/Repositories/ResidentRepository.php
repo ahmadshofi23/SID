@@ -147,6 +147,30 @@ final class ResidentRepository extends GuardedRepository
     }
 
     /** Jumlah penduduk aktif dalam lingkup pengguna. */
+    /**
+     * Beberapa penduduk sekaligus, berlingkup, beserta keluarga & wilayahnya.
+     *
+     * Dipakai layar yang menampilkan sedikit penduduk yang dipilih dari modul
+     * lain (mis. antrean verifikasi akun warga). Mengambilnya satu per satu
+     * berarti N kueri; memuat relasinya belakangan melanggar
+     * Model::preventLazyLoading() yang menyala di pengembangan dan pengujian.
+     *
+     * @param  list<string>  $ids
+     * @return Collection<string, Resident>
+     */
+    public function findManyWithContext(array $ids): Collection
+    {
+        if ($ids === []) {
+            return new Collection;
+        }
+
+        return $this->scoped()
+            ->with(['family', 'region.parent.parent'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+    }
+
     public function countActive(): int
     {
         return $this->scoped()->active()->count();

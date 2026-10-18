@@ -26,6 +26,11 @@ use Illuminate\Support\Str;
  * @property int $failed_login_count
  * @property Carbon|null $locked_until
  * @property Carbon|null $two_factor_confirmed_at
+ * @property string|null $verification_method
+ * @property string|null $verification_document_path
+ * @property string|null $verified_by
+ * @property Carbon|null $verified_at
+ * @property string|null $verification_note
  * @property mixed $two_factor_secret
  * @property mixed $two_factor_recovery_codes
  * @property-read Resident|null $resident

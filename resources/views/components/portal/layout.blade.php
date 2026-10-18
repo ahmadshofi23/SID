@@ -181,6 +181,12 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{{ route('daftar') }}"
+                           class="touch-target flex items-center rounded-lg px-3 text-sm font-medium text-content-secondary hover:bg-surface-hover">
+                            Daftar akun warga
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ route('login') }}"
                            class="touch-target flex items-center rounded-lg px-3 text-sm font-medium text-accent hover:bg-surface-hover">
                             Masuk ke sistem
@@ -245,6 +251,7 @@
             <ul class="mt-2 space-y-1 text-sm">
                 <li><a class="text-accent hover:underline" href="{{ route('portal.layanan') }}">Standar pelayanan surat</a></li>
                 <li><a class="text-accent hover:underline" href="{{ route('surat.lacak') }}">Lacak status pengajuan surat</a></li>
+                <li><a class="text-accent hover:underline" href="{{ route('daftar') }}">Daftar akun warga</a></li>
                 <li><a class="text-accent hover:underline" href="{{ route('login') }}">Masuk ke sistem (petugas)</a></li>
             </ul>
         </div>

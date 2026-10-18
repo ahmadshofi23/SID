@@ -4,7 +4,7 @@ import { Link, router } from '@inertiajs/vue3'
 import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
     ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
-    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search, Newspaper, Globe,
+    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search, Newspaper, Globe, UserCheck,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
@@ -118,6 +118,9 @@ const groups = computed<NavGroup[]>(() => [
     {
         label: 'Pengaturan',
         items: [
+            { label: 'Verifikasi Warga', route: '/pengaturan/verifikasi-warga',
+              pattern: '/pengaturan/verifikasi-warga', icon: UserCheck,
+              show: can('pengguna.verifikasi') },
             { label: 'Log Aktivitas', route: '/pengaturan/log-aktivitas',
               pattern: '/pengaturan/log-aktivitas', icon: ScrollText, show: can('audit.lihat') },
         ],
