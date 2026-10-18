@@ -35,6 +35,11 @@ final class MutationService
     /**
      * Catat kematian — status menjadi `meninggal` (RULE-03).
      *
+     * `$data['letter_id']` diisi bila mutasi ini berasal dari tawaran surat
+     * SKM (docs/13 §5.5). Tautannya disimpan agar pertanyaan "atas dasar apa
+     * status warga ini diubah?" dapat dijawab dari catatan mutasinya sendiri,
+     * tanpa menebak dari kedekatan waktu dengan surat yang terbit hari itu.
+     *
      * @param  array<string, mixed>  $data
      */
     public function recordDeath(Resident $resident, array $data): ResidentMutation
@@ -50,6 +55,7 @@ final class MutationService
                 'document_no' => $data['document_no'] ?? null,
                 'reported_by' => $data['reported_by'] ?? null,
                 'reason' => $data['reason'] ?? null,
+                'letter_id' => $data['letter_id'] ?? null,
             ]);
 
             $resident->status = 'meninggal';
@@ -145,6 +151,7 @@ final class MutationService
                 'document_no' => $data['document_no'] ?? null,
                 'reported_by' => $data['reported_by'] ?? null,
                 'reason' => $data['reason'] ?? null,
+                'letter_id' => $data['letter_id'] ?? null,
             ],
         )));
     }

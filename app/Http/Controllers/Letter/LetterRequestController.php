@@ -7,11 +7,15 @@ namespace App\Http\Controllers\Letter;
 use App\Auth\AccessScope;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\LetterAttachmentPresenter;
+use App\Http\Resources\LetterMutationOfferPresenter;
 use App\Http\Resources\LetterRequestPresenter;
 use App\Models\LetterRequest;
 use App\Models\LetterType;
 use App\Models\Official;
+use App\Models\Resident;
+use App\Models\ResidentMutation;
 use App\Repositories\LetterRequestRepository;
+use App\Repositories\ResidentRepository;
 use App\Services\Letter\DynamicFormValidator;
 use App\Services\Letter\LetterAttachmentService;
 use App\Services\Letter\LetterNumberService;
@@ -69,6 +73,7 @@ final class LetterRequestController extends Controller
     public function show(
         string $id,
         LetterRequestRepository $requests,
+        ResidentRepository $residents,
         DynamicFormValidator $forms,
         LetterNumberService $numbers,
         LetterAttachmentService $attachments,
@@ -76,12 +81,30 @@ final class LetterRequestController extends Controller
         $this->authorize('surat.lihat');
 
         $request = $requests->findOrFail($id);
-        $request->load(['letterType', 'resident.family', 'logs', 'letter', 'attachments']);
+        $request->load([
+            'letterType', 'resident.family', 'logs', 'letter', 'attachments',
+            'mutationOffer.mutation',
+        ]);
 
         return Inertia::render('Surat/Pengajuan/Detail', [
             'request' => LetterRequestPresenter::detail($request),
             'form_fields' => $forms->fields($request->letterType),
             'attachments' => LetterAttachmentPresenter::forRequest($request),
+            /*
+             * Tawaran mutasi SKL/SKM — docs/13 §5.4 & §5.5, KEP-015.
+             *
+             * Sasaran tawaran kematian dicari lewat ResidentRepository yang
+             * BERLINGKUP, bukan diambil dari relasi pengajuan: almarhum
+             * bukan pemohon, dan `resident_meninggal_id` hanyalah isian
+             * formulir yang lingkupnya belum pernah diperiksa. Bila ia di
+             * luar lingkup pengguna, payloadnya null dan layar menjelaskan
+             * bahwa tawaran harus diputuskan petugas yang berwenang — tanpa
+             * membocorkan bahwa orangnya ada (docs/06 §4).
+             */
+            'mutation_offer' => LetterMutationOfferPresenter::make(
+                $request,
+                self::deathOfferTarget($request, $residents),
+            ),
             'upload' => self::uploadConstraints($attachments),
             /*
              * Nomor berikutnya ditampilkan agar petugas tahu nomor berapa
@@ -323,6 +346,29 @@ final class LetterRequestController extends Controller
         $service->cancel($requests->findOrFail($id), $request->input('reason'));
 
         return back()->with('success', 'Pengajuan dibatalkan.');
+    }
+
+    /**
+     * Almarhum pada tawaran mutasi kematian — null bila tidak relevan.
+     *
+     * `find()`, bukan `findOrFail()`: almarhum di luar lingkup pengguna tidak
+     * boleh membuat SELURUH layar pengajuan menjadi 404. Pengajuannya sendiri
+     * sah dilihat petugas ini; yang tidak boleh ia lihat hanyalah data warga
+     * itu, dan panel tawaran menyesuaikan diri.
+     */
+    private static function deathOfferTarget(
+        LetterRequest $request,
+        ResidentRepository $residents,
+    ): ?Resident {
+        $offer = $request->mutationOffer;
+
+        if ($offer === null || $offer->mutation_type !== ResidentMutation::TYPE_DEATH) {
+            return null;
+        }
+
+        $id = $request->form_data['resident_meninggal_id'] ?? null;
+
+        return is_string($id) && $id !== '' ? $residents->find($id) : null;
     }
 
     /**

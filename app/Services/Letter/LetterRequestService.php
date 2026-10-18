@@ -42,6 +42,7 @@ final class LetterRequestService
         private readonly LetterBodyComposer $body,
         private readonly LetterContextBuilder $context,
         private readonly DynamicFormValidator $forms,
+        private readonly MutationOfferService $mutationOffers,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -319,6 +320,18 @@ final class LetterRequestService
              * membuat sebagian pengungkapan lolos tanpa jejak.
              */
             $this->audit->logPiiReveal($request->resident, 'nik');
+
+            /*
+             * TAWARAN mutasi untuk SKL/SKM — docs/13 §5.4 & §5.5, KEP-015.
+             *
+             * Hanya sebuah baris "menunggu": tidak ada status penduduk yang
+             * berubah di sini, dan tidak ada apa pun pada penerbitan yang
+             * bergantung padanya. Dibuat DI DALAM transaksi ini supaya setiap
+             * SKL/SKM yang terbit pasti punya tawarannya — tawaran yang hilang
+             * berarti kelahiran/kematian yang diam-diam tidak pernah masuk
+             * basis data penduduk, yaitu persis masalah yang hendak dicegah.
+             */
+            $this->mutationOffers->createFor($request, $letter);
 
             $this->audit->log('letter.issued', $letter, context: [
                 'nomor_surat' => $number,

@@ -502,3 +502,73 @@ kedua milik pemohon.
 5. Saat akun warga tersedia di Sprint 6, halaman ini **tetap ada** sebagai "cek
    resi" tanpa login; daftar pengajuan milik akun sendiri menjadi jalur kedua,
    bukan pengganti.
+
+---
+
+## KEP-015 — Mutasi dari SKL/SKM: tawaran berstatus, dan mengapa kelahiran butuh satu layar
+**Tanggal:** 2026-10-16 · **Status:** Wajib · **Kategori:** integritas data, alur kerja
+
+**Masalah yang ditemukan:** docs/13 §5.4 dan §5.5 meminta sistem **menawarkan**
+pencatatan mutasi saat SKL/SKM terbit — "satu klik, data sudah terisi dari
+formulir". Saat dibangun, dua hal di dalam permintaan itu ternyata saling
+bertentangan dengan keadaan basis data:
+
+1. `residents.nik` adalah kolom WAJIB dan unik di antara penduduk aktif
+   (RULE-01, indeks `uq_residents_nik_active`). Bayi baru lahir belum punya NIK
+   — dan NIK itulah yang justru sedang diurus dengan SKL. Jadi "satu klik"
+   untuk kelahiran mustahil tanpa memalsukan NIK sementara, yang akan menjadi
+   duplikat permanen begitu Dukcapil menerbitkan NIK yang sebenarnya.
+2. "Sudah dicatat" dapat diturunkan dari ada-tidaknya mutasi yang menunjuk
+   surat tersebut, tetapi "sudah dilihat dan sengaja DITOLAK" tidak dapat
+   diturunkan dari apa pun.
+
+**Pilihan yang dipertimbangkan:** (a) mencatat mutasi otomatis saat surat
+terbit; (b) tawaran tanpa status, dihitung dari ada-tidaknya mutasi;
+(c) tawaran berstatus pada tabelnya sendiri.
+
+**Keputusan:**
+1. Dipilih **(c)**: tabel `letter_mutation_offers`, satu baris per pengajuan,
+   berstatus `menunggu` / `diterima` / `ditolak`. Pilihan (b) ditolak karena
+   tawaran yang sudah ditolak akan muncul kembali setiap kali layar dibuka;
+   petugas belajar mengabaikannya, dan itu menghapus seluruh manfaatnya.
+2. **(a) ditolak, dan penolakan ini mengikat.** Mutasi mengubah status
+   penduduk, dan untuk kematian ia tidak dapat ditarik kembali lewat
+   antarmuka. Surat yang keliru masih dapat dibatalkan (RULE-05); status
+   penduduk yang keliru mengubah statistik, laporan ke kecamatan, dan
+   kelayakan bantuan. Keputusan sebesar itu ditekan oleh orang, bukan menjadi
+   akibat samping penerbitan surat. Selain itu kelahiran/kematian sering sudah
+   dicatat lewat modul kependudukan lebih dulu — otomatis berarti mutasi
+   ganda. `MutationOfferTest` menjaga aturan ini: penerbitan SKL tidak
+   mendaftarkan penduduk, dan penerbitan SKM tidak mengubah status siapa pun.
+3. Tawaran dibuat **setelah** surat terbit, di dalam transaksi penerbitan, dan
+   **tidak diperiksa di mana pun** oleh mesin status pengajuan. Menolak
+   tawaran karena itu tidak dapat menghalangi penerbitan — warga yang
+   kehilangan anggota keluarga tidak boleh menunggu di loket karena petugas
+   belum siap memutuskan mutasi.
+4. **Kematian benar-benar satu klik**; **kelahiran mendapat satu layar
+   isian** (`Surat/TawaranMutasi/Kelahiran`) yang seluruh kolomnya sudah
+   terisi dari formulir surat kecuali NIK bayi. Layar itu menyatakan dengan
+   tegas: bila NIK belum ada, tolak tawaran dan catat kelahirannya setelah
+   akta keluar — jangan mengisi angka sementara.
+5. Kolom selain NIK dan nama anak **ditampilkan, tidak dapat disunting**:
+   nilainya sudah tercetak pada surat yang terbit, dan data penduduk yang
+   berbeda dari surat atas peristiwa yang sama adalah selisih baru, bukan
+   perbaikan. Nama anak dikecualikan karena SKL sering memuat nama sementara
+   ("Bayi Ny. …") sementara data penduduk harus memuat nama resminya.
+6. **Dua izin, bukan satu.** Rutenya dijaga `mutasi.tambah`; menerima tawaran
+   kelahiran menuntut `penduduk.tambah` sebagai tambahan, karena yang terjadi
+   adalah pendaftaran penduduk baru. Akibatnya nyata: Kasi Pemerintahan —
+   pemeriksa SKL/SKM — dapat mencatat kematian dan menolak tawaran, tetapi
+   tidak dapat mendaftarkan bayi; layarnya menjelaskan itu alih-alih
+   menampilkan tombol yang akan berakhir 403.
+7. Almarhum pada SKM diambil lewat `ResidentRepository` yang **berlingkup**,
+   bukan dari relasi pengajuan: `resident_meninggal_id` hanyalah isian
+   formulir dan lingkupnya belum pernah diperiksa. Di luar lingkup → **404**,
+   bukan 403 (docs/06 §4), dan panelnya tampil tanpa data warga tersebut.
+8. Setiap mutasi hasil tawaran menyimpan `letter_id` dan nomor surat desa pada
+   `document_no`, sehingga pertanyaan "atas dasar apa status warga ini
+   berubah?" dapat dijawab dari catatan mutasinya sendiri — tanpa menebak dari
+   kedekatan waktu dengan surat yang terbit hari itu.
+9. Surat yang **dibatalkan** tidak dapat lagi menjadi dasar mutasi (RULE-05):
+   tanpa pagar ini, surat yang dibatalkan justru karena datanya keliru masih
+   dapat dipakai mengubah status penduduk.

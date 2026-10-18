@@ -12,9 +12,11 @@ import SelectField from '@/Components/SelectField.vue'
 import TextareaField from '@/Components/TextareaField.vue'
 import LetterStatusBadge from '@/Components/LetterStatusBadge.vue'
 import LampiranPanel from '@/Components/LampiranPanel.vue'
+import TawaranMutasiPanel from '@/Components/TawaranMutasiPanel.vue'
 import { usePageData } from '@/composables/usePage'
 import type {
     LetterRequestDetail, LetterFormField, LetterAttachment, UploadConstraints,
+    LetterMutationOffer,
 } from '@/types'
 
 const props = defineProps<{
@@ -24,6 +26,8 @@ const props = defineProps<{
     upload: UploadConstraints
     next_number_preview: string | null
     signers: { id: string; name: string; position: string }[]
+    /** Tawaran mutasi SKL/SKM — null untuk jenis surat lain (docs/13 §5.4-5.5). */
+    mutation_offer: LetterMutationOffer | null
 }>()
 
 const { can, user } = usePageData()
@@ -241,6 +245,23 @@ function formatDate(value: string | null): string {
                         Lihat &amp; cetak surat
                     </AppButton>
                 </section>
+
+                <!--
+                  Tawaran mutasi SKL/SKM — docs/13 §5.4 & §5.5, KEP-015.
+
+                  Di kolom utama, tepat setelah "Surat sudah terbit": ia
+                  menyangkut data penduduk, bukan alur surat. Ditaruh di
+                  panel tindakan, ia akan terbaca sebagai langkah lanjutan
+                  yang wajib — padahal menolaknya sah dan tidak berakibat
+                  apa pun pada suratnya.
+                -->
+                <TawaranMutasiPanel
+                    v-if="mutation_offer"
+                    :request-id="request.id"
+                    :offer="mutation_offer"
+                    :can-decide="can('mutasi.tambah')"
+                    :can-add-resident="can('penduduk.tambah')"
+                />
 
                 <!-- Isian formulir -->
                 <section class="card p-4" aria-label="Isian formulir">

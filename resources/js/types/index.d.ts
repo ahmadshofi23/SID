@@ -265,6 +265,37 @@ export interface LetterRequestRow {
     created_at: string | null
 }
 
+/**
+ * Tawaran pencatatan mutasi dari SKL/SKM — docs/13 §5.4 & §5.5, KEP-015.
+ *
+ * `target` adalah ALMARHUM pada tawaran kematian, bukan pemohon surat —
+ * pemohon SKM adalah pelapor. Ia null bila warga itu di luar lingkup
+ * pengguna, dan layar harus menanganinya tanpa menampilkan tombol.
+ */
+export interface LetterMutationOffer {
+    id: string
+    mutation_type: 'lahir' | 'mati'
+    mutation_label: string
+    status: 'menunggu' | 'diterima' | 'ditolak'
+    is_pending: boolean
+    /** Sudah diformat pada kalender desa — jangan diformat ulang. */
+    decided_at: string | null
+    decided_by_name: string | null
+    decline_reason: string | null
+    /** Penduduk hasil mutasi; pada SKL inilah bayi yang baru dibuat. */
+    resident_id: string | null
+    letter_cancelled: boolean
+    target: {
+        id: string
+        full_name: string
+        nik_masked: string
+        status: string
+        is_head_of_family: boolean
+        family_id: string | null
+    } | null
+    applicant_has_family: boolean
+}
+
 export interface LetterRequestDetail extends LetterRequestRow {
     form_data: LetterFormValues
     rejection_reason: string | null

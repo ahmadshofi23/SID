@@ -189,4 +189,17 @@ final class LetterRequest extends Model
     {
         return $this->hasOne(Letter::class, 'request_id');
     }
+
+    /**
+     * Tawaran pencatatan mutasi dari SKL/SKM — docs/13 §5.4 & §5.5.
+     *
+     * HasOne, bukan HasMany: indeks unik `uq_lmo_request` menjaga satu
+     * tawaran per pengajuan.
+     *
+     * @return HasOne<LetterMutationOffer, $this>
+     */
+    public function mutationOffer(): HasOne
+    {
+        return $this->hasOne(LetterMutationOffer::class, 'request_id');
+    }
 }

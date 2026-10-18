@@ -13,6 +13,7 @@ use App\Http\Controllers\Letter\LetterRequestController;
 use App\Http\Controllers\Letter\LetterTrackingController;
 use App\Http\Controllers\Letter\LetterTypeController;
 use App\Http\Controllers\Letter\LetterVerificationController;
+use App\Http\Controllers\Letter\MutationOfferController;
 use App\Http\Controllers\Population\AnomalyController;
 use App\Http\Controllers\Population\FamilyController;
 use App\Http\Controllers\Population\ImportController;
@@ -251,6 +252,22 @@ Route::middleware('auth')->group(function (): void {
         // Penerbitan: di sinilah nomor surat terbit (RULE-04, ADR-001).
         Route::post('{id}/terbitkan', [LetterRequestController::class, 'issue'])
             ->middleware('izin:surat.setujui')->name('surat.terbitkan');
+
+        /*
+         * Tawaran mutasi dari SKL/SKM (Sprint 5, KEP-015, docs/13 §5.4-5.5).
+         *
+         * Berizin `mutasi.tambah`, BUKAN `surat.*`: yang dilakukan di sini
+         * adalah mengubah data kependudukan, dan kewenangan itu tidak ikut
+         * dengan kewenangan memproses surat. Petugas surat yang tidak
+         * berwenang mencatat mutasi tetap melihat tawarannya sebagai
+         * keterangan, tanpa tombol.
+         */
+        Route::get('{id}/tawaran-mutasi', [MutationOfferController::class, 'create'])
+            ->middleware('izin:mutasi.tambah')->name('surat.tawaran-mutasi.create');
+        Route::post('{id}/tawaran-mutasi', [MutationOfferController::class, 'store'])
+            ->middleware('izin:mutasi.tambah')->name('surat.tawaran-mutasi.store');
+        Route::post('{id}/tawaran-mutasi/tolak', [MutationOfferController::class, 'decline'])
+            ->middleware('izin:mutasi.tambah')->name('surat.tawaran-mutasi.tolak');
     });
 
     /* ------------------------ Jenis surat & template --------------------- */
