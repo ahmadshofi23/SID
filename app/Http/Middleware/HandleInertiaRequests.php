@@ -51,6 +51,17 @@ final class HandleInertiaRequests extends Middleware
                 'user' => $user === null ? null : $this->userPayload($user),
             ],
 
+            /*
+             * Jumlah notifikasi belum dibaca untuk lonceng di setiap layar.
+             *
+             * Closure, bukan nilai: ia menjadi satu kueri COUNT pada SETIAP
+             * permintaan Inertia, dan pengguna yang belum masuk tidak perlu
+             * membayarnya sama sekali.
+             */
+            'notifikasi_belum_dibaca' => fn (): int => $user === null
+                ? 0
+                : $user->unreadNotifications()->count(),
+
             // Lazy: hanya dihitung saat benar-benar ada pesan.
             'flash' => fn (): array => [
                 'status' => $request->session()->get('status'),

@@ -17,6 +17,7 @@ use App\Http\Controllers\Letter\LetterTrackingController;
 use App\Http\Controllers\Letter\LetterTypeController;
 use App\Http\Controllers\Letter\LetterVerificationController;
 use App\Http\Controllers\Letter\MutationOfferController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Population\AnomalyController;
 use App\Http\Controllers\Population\FamilyController;
 use App\Http\Controllers\Population\ImportController;
@@ -332,6 +333,14 @@ Route::middleware('auth')->group(function (): void {
     });
 
     /* ------------------------ Jenis surat & template --------------------- */
+    /* -------------------- Notifikasi (Sprint 6) ------------------------
+     | FR-SRT-14, BR-11. Satu layar untuk petugas maupun warga: isinya
+     | berbeda, perilakunya identik.
+     */
+    Route::get('notifikasi', [NotificationController::class, 'index'])->name('notifikasi.index');
+    Route::post('notifikasi/{id}/baca', [NotificationController::class, 'read'])->name('notifikasi.baca');
+    Route::post('notifikasi/baca-semua', [NotificationController::class, 'readAll'])->name('notifikasi.baca-semua');
+
     /* ------------------------ Portal warga (Sprint 6) -------------------
      | UC-05, FR-SRT-04, BR-10 — docs/07 §2.2.
      |

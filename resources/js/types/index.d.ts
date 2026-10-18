@@ -29,7 +29,20 @@ export interface PageProps {
     auth: { user: AuthUser | null }
     flash: FlashMessages
     errors: Record<string, string>
+    /** Jumlah notifikasi belum dibaca untuk lonceng (FR-SRT-14). */
+    notifikasi_belum_dibaca: number
     [key: string]: unknown
+}
+
+export interface NotifikasiRow {
+    id: string
+    kategori: string
+    judul: string
+    isi: string
+    tiket: string | null
+    nomor_surat: string | null
+    dibaca: boolean
+    created_at: string | null
 }
 
 export interface Region {

@@ -9,6 +9,7 @@ import {
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
 import FlashMessages from '@/Components/FlashMessages.vue'
+import NotificationBell from '@/Components/NotificationBell.vue'
 
 defineProps<{ title?: string }>()
 
@@ -204,6 +205,8 @@ function logout(): void {
                 </Link>
 
                 <div class="ml-auto flex items-center gap-1">
+                    <NotificationBell />
+
                     <button
                         type="button"
                         class="flex size-10 items-center justify-center rounded-lg text-content-secondary

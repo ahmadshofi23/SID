@@ -5,6 +5,7 @@ import { Landmark, House, FilePlus2, FileClock, Users, LogOut, Sun, Moon } from 
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
 import FlashMessages from '@/Components/FlashMessages.vue'
+import NotificationBell from '@/Components/NotificationBell.vue'
 
 /*
  * Kerangka portal warga — docs/07 §2.2.
@@ -91,6 +92,8 @@ function keluar(): void {
                 </nav>
 
                 <div class="ml-auto flex items-center gap-1 sm:ml-0">
+                    <NotificationBell />
+
                     <button
                         type="button"
                         class="touch-target flex items-center justify-center rounded-lg px-2

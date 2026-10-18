@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
@@ -38,7 +39,7 @@ use Illuminate\Support\Str;
  */
 final class User extends Authenticatable implements AuthenticatableContract
 {
-    use HasUuids, SoftDeletes;
+    use HasUuids, Notifiable, SoftDeletes;
 
     protected $keyType = 'string';
 
