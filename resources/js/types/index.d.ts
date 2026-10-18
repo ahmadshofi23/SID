@@ -246,6 +246,19 @@ export interface LetterRequestTracking {
     issued_at: string | null
 }
 
+/**
+ * Pengajuan milik akun warga sendiri — dibangun di atas LetterRequestTracking
+ * (lihat LetterRequestPresenter::forCitizen). Nama pemohon di sini TIDAK
+ * tersamar: pembukanya sudah masuk sebagai anggota keluarga itu.
+ */
+export interface LetterRequestForCitizen extends Omit<LetterRequestTracking, 'resident_name'> {
+    id: string
+    resident_name: string
+    purpose: string | null
+    /** Null bila surat belum terbit atau sudah dibatalkan (RULE-05). */
+    letter_id: string | null
+}
+
 export interface LetterRequestRow {
     id: string
     ticket_number: string

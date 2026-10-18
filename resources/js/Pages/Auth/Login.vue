@@ -54,6 +54,11 @@ function submit(): void {
             <p class="text-center text-sm">
                 <Link href="/lupa-sandi" class="text-accent hover:underline">Lupa kata sandi?</Link>
             </p>
+
+            <p class="text-center text-sm text-content-secondary">
+                Warga desa dan belum punya akun?
+                <Link href="/daftar" class="text-accent hover:underline">Daftar di sini</Link>
+            </p>
         </form>
     </GuestLayout>
 </template>

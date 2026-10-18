@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\Citizen\CitizenVerificationController;
 use App\Http\Controllers\Citizen\RegistrationController;
+use App\Http\Controllers\Citizen\WargaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Letter\LetterAttachmentController;
 use App\Http\Controllers\Letter\LetterController;
@@ -331,6 +332,36 @@ Route::middleware('auth')->group(function (): void {
     });
 
     /* ------------------------ Jenis surat & template --------------------- */
+    /* ------------------------ Portal warga (Sprint 6) -------------------
+     | UC-05, FR-SRT-04, BR-10 — docs/07 §2.2.
+     |
+     | Dijaga middleware `warga`: berperan warga, akun aktif, dan tertaut ke
+     | satu data penduduk. Pembatasan ke dirinya sendiri + satu KK (RULE-11)
+     | TIDAK ditegakkan di sini melainkan di lapis repository — pengajuan
+     | keluarga lain tidak terlihat, sehingga menjadi 404 dengan sendirinya.
+     |
+     | Unduhan surat memakai rute arsip yang sudah ada (`surat.pdf`):
+     | LetterRepository berlingkup keluarga dan peran `warga` memegang
+     | `surat.lihat`, jadi rute kedua hanya akan menjadi jalur kedua yang
+     | harus ikut diperiksa setiap kali aturan aksesnya berubah.
+     */
+    Route::get('warga/belum-aktif', [WargaController::class, 'belumAktif'])
+        ->name('warga.belum-aktif');
+
+    Route::prefix('warga')->middleware('warga')->group(function (): void {
+        Route::get('/', [WargaController::class, 'beranda'])->name('warga.beranda');
+        Route::get('keluarga', [WargaController::class, 'keluarga'])->name('warga.keluarga');
+
+        Route::get('ajukan', [WargaController::class, 'ajukan'])->name('warga.ajukan');
+        Route::post('ajukan', [WargaController::class, 'kirim'])
+            ->middleware('throttle:20,60')   // pengajuan daring, bukan loket
+            ->name('warga.ajukan.kirim');
+
+        Route::get('pengajuan', [WargaController::class, 'pengajuan'])->name('warga.pengajuan');
+        Route::get('pengajuan/{id}', [WargaController::class, 'pengajuanDetail'])
+            ->name('warga.pengajuan.detail');
+    });
+
     /* ---------------- Verifikasi akun warga (Sprint 6) -----------------
      | FR-AUT-09, UC-15. Izin `pengguna.verifikasi` — pada matriks RBAC
      | hanya Admin Desa: menyetujui satu akun warga sama beratnya dengan

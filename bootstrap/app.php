@@ -6,6 +6,7 @@ use App\Http\Middleware\AssignCorrelationId;
 use App\Http\Middleware\EnforceSessionPolicy;
 use App\Http\Middleware\EnforceTwoFactor;
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\EnsureVerifiedCitizen;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
 use App\Providers\SidServiceProvider;
@@ -33,6 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'izin' => EnsurePermission::class,
+            // Pintu portal warga: berperan warga, akun aktif, tertaut ke
+            // satu data penduduk (UC-05 prakondisi, RULE-11).
+            'warga' => EnsureVerifiedCitizen::class,
         ]);
 
         // Rute masuk dialihkan ke /masuk, bukan /login.

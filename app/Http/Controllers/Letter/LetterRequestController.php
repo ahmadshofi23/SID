@@ -20,7 +20,6 @@ use App\Services\Letter\DynamicFormValidator;
 use App\Services\Letter\LetterAttachmentService;
 use App\Services\Letter\LetterNumberService;
 use App\Services\Letter\LetterRequestService;
-use App\Services\Upload\FileSignature;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -105,7 +104,7 @@ final class LetterRequestController extends Controller
                 $request,
                 self::deathOfferTarget($request, $residents),
             ),
-            'upload' => self::uploadConstraints($attachments),
+            'upload' => $attachments->constraints(),
             /*
              * Nomor berikutnya ditampilkan agar petugas tahu nomor berapa
              * yang akan terbit. Ini PERKIRAAN: nomor sebenarnya ditetapkan
@@ -146,7 +145,7 @@ final class LetterRequestController extends Controller
                 'warning_note' => $t->warning_note,
             ])->all(),
             'selected_type_id' => $selected?->id,
-            'upload' => self::uploadConstraints($attachments),
+            'upload' => $attachments->constraints(),
         ]);
     }
 
@@ -176,7 +175,7 @@ final class LetterRequestController extends Controller
          *
          * @var array<string, UploadedFile> $berkas
          */
-        $berkas = self::uploadedRequirementFiles($request);
+        $berkas = $attachments->requirementFilesFrom($request);
 
         $attachments->assertAllValid($berkas);
 
@@ -195,7 +194,7 @@ final class LetterRequestController extends Controller
             $attachments->store(
                 $letterRequest,
                 $file,
-                self::requirementIndexFromField($field, $type),
+                $attachments->requirementIndex($field, $type),
                 $field,
             );
         }
@@ -369,56 +368,5 @@ final class LetterRequestController extends Controller
         $id = $request->form_data['resident_meninggal_id'] ?? null;
 
         return is_string($id) && $id !== '' ? $residents->find($id) : null;
-    }
-
-    /**
-     * Berkas syarat dari formulir pembuatan, berkunci `syarat.<indeks>`.
-     *
-     * Dikumpulkan sendiri, bukan lewat $request->validate(['syarat.*' => ...]),
-     * karena kuncinya harus tetap utuh sampai ke pesan galat: petugas perlu
-     * melihat berkas MANA yang ditolak, dan daftar syarat di layar diurutkan
-     * persis menurut indeks itu.
-     *
-     * @return array<string, UploadedFile>
-     */
-    private static function uploadedRequirementFiles(Request $request): array
-    {
-        $files = [];
-
-        foreach ((array) $request->file('syarat', []) as $index => $file) {
-            if ($file instanceof UploadedFile) {
-                $files['syarat.'.$index] = $file;
-            }
-        }
-
-        return $files;
-    }
-
-    /** `syarat.3` → 3, bila jenis surat ini benar punya syarat ke-3. */
-    private static function requirementIndexFromField(string $field, LetterType $type): ?int
-    {
-        $index = (int) str_replace('syarat.', '', $field);
-
-        return isset($type->requirements[$index]) ? $index : null;
-    }
-
-    /**
-     * Batasan unggahan yang DITAMPILKAN di layar.
-     *
-     * Dikirim dari server, bukan ditulis ulang sebagai angka tetap di Vue:
-     * batas 5 MB berasal dari config/sid.php, dan dua sumber kebenaran
-     * berarti layar suatu saat akan menjanjikan batas yang tidak sama
-     * dengan yang sungguh diterima.
-     *
-     * @return array<string, mixed>
-     */
-    private static function uploadConstraints(LetterAttachmentService $attachments): array
-    {
-        return [
-            'accept' => FileSignature::acceptAttribute(),
-            'max_bytes' => $attachments->maxBytes(),
-            'max_label' => $attachments->humanSize($attachments->maxBytes()),
-            'types_label' => FileSignature::acceptedLabels(),
-        ];
     }
 }

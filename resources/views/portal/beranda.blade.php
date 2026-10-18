@@ -24,7 +24,7 @@
               sudah berjalan hari ini: pelacakan status pengajuan (KEP-014).
             --}}
             <div class="mt-7 flex flex-col gap-3 sm:flex-row">
-                <a href="{{ route('portal.layanan') }}"
+                <a href="{{ auth()->check() ? route('warga.ajukan') : route('portal.layanan') }}"
                    class="touch-target inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 font-medium text-content-inverse transition-colors hover:bg-accent-hover">
                     Ajukan Surat
                     <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"

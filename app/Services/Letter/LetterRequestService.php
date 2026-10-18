@@ -62,6 +62,7 @@ final class LetterRequestService
         array $formInput,
         string $channel = 'online',
         bool $submit = true,
+        bool $allowDuplicate = false,
     ): LetterRequest {
         if (! $type->is_active) {
             throw ValidationException::withMessages([
@@ -86,7 +87,20 @@ final class LetterRequestService
 
         $existing = $this->requests->openRequestFor($resident->id, $type->id);
 
-        if ($existing !== null) {
+        /*
+         * Pengajuan kembar DIHALANGI secara bawaan, tetapi tidak dilarang.
+         *
+         * UC-05 alur 7b meminta sistem MEMPERINGATKAN dan meminta konfirmasi,
+         * bukan memblokir: alasan sah untuk mengajukan surat sejenis dua kali
+         * memang ada (satu untuk sekolah, satu untuk bank, masing-masing
+         * perlu lembar asli). Karena itu $allowDuplicate ada — jalur daring
+         * memanggilnya `true` setelah warga menekan "Ya, tetap ajukan".
+         *
+         * Bawaannya tetap `false` sehingga perilaku loket tidak berubah:
+         * petugas yang tidak sengaja membuat pengajuan kedua untuk warga yang
+         * sama tetap dihentikan dan diberi tahu nomor tiket yang berjalan.
+         */
+        if ($existing !== null && ! $allowDuplicate) {
             throw ValidationException::withMessages([
                 'resident_id' => 'Pemohon masih memiliki pengajuan '.$type->name
                     .' yang sedang diproses (tiket '.$existing->ticket_number.').',

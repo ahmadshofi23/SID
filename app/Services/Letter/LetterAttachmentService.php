@@ -6,9 +6,11 @@ namespace App\Services\Letter;
 
 use App\Models\LetterAttachment;
 use App\Models\LetterRequest;
+use App\Models\LetterType;
 use App\Services\Audit\AuditLogger;
 use App\Services\Upload\FileSignature;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -239,6 +241,84 @@ final class LetterAttachmentService
     public function diskName(): string
     {
         return (string) config('sid.uploads.disk', 'local');
+    }
+
+    /**
+     * Batasan unggahan untuk ditampilkan di formulir.
+     *
+     * Dipindahkan ke sini dari controller karena DUA layar memakainya —
+     * pengajuan loket oleh petugas dan pengajuan daring oleh warga. Dua
+     * salinan berarti batas ukuran di layar warga kelak berbeda dari yang
+     * benar-benar ditegakkan server, dan warga diberi tahu angka yang salah.
+     *
+     * @return array{accept: string, max_bytes: int, max_label: string, types_label: string}
+     */
+    public function constraints(): array
+    {
+        return [
+            'accept' => FileSignature::acceptAttribute(),
+            'max_bytes' => $this->maxBytes(),
+            'max_label' => $this->humanSize($this->maxBytes()),
+            'types_label' => FileSignature::acceptedLabels(),
+        ];
+    }
+
+    /**
+     * Berkas syarat dari permintaan, berkunci `syarat.<indeks>`.
+     *
+     * @return array<string, UploadedFile>
+     */
+    public function requirementFilesFrom(Request $request): array
+    {
+        $files = [];
+
+        foreach ((array) $request->file('syarat', []) as $index => $file) {
+            if ($file instanceof UploadedFile) {
+                $files['syarat.'.$index] = $file;
+            }
+        }
+
+        return $files;
+    }
+
+    /** Indeks syarat dari nama field, atau null bila di luar daftar syarat. */
+    public function requirementIndex(string $field, LetterType $type): ?int
+    {
+        $index = (int) str_replace('syarat.', '', $field);
+
+        return isset($type->requirements[$index]) ? $index : null;
+    }
+
+    /**
+     * Syarat WAJIB yang belum ada berkasnya — BR-10.
+     *
+     * MENGAPA HANYA DIPAKAI JALUR DARING: di loket, petugas memegang berkas
+     * fisik dan sering memindainya belakangan, sehingga memblokir pengajuan
+     * karena berkas belum diunggah akan memulangkan warga yang sudah berdiri
+     * di depan meja. Warga yang mengajukan dari rumah tidak punya petugas
+     * yang dapat menyusulkan berkasnya, jadi di sana syarat wajib benar-benar
+     * wajib — dan kekurangannya harus DISEBUTKAN satu per satu, bukan ditolak
+     * dengan "lengkapi syarat".
+     *
+     * @param  array<string, UploadedFile>  $files
+     * @return array<string, string> kunci field => pesan
+     */
+    public function missingRequiredRequirements(LetterType $type, array $files): array
+    {
+        $missing = [];
+
+        foreach ($type->requirements as $index => $requirement) {
+            if (($requirement['required'] ?? true) !== true) {
+                continue;
+            }
+
+            if (! isset($files['syarat.'.$index])) {
+                $missing['syarat.'.$index] = 'Unggah "'.($requirement['label'] ?? 'dokumen syarat')
+                    .'" — syarat ini wajib untuk '.$type->name.'.';
+            }
+        }
+
+        return $missing;
     }
 
     public function maxBytes(): int

@@ -59,12 +59,51 @@
                 <section aria-labelledby="judul-cara">
                     <h2 id="judul-cara" class="text-xl font-semibold">Cara mengajukan</h2>
 
-                    <ol class="mt-3 space-y-3">
+                    {{--
+                      DUA JALUR, dan keduanya tetap terbuka. Pengajuan daring
+                      tidak menggantikan loket: sebagian warga tidak punya akun,
+                      tidak punya ponsel yang memadai, atau memang lebih percaya
+                      datang langsung (docs/03 §2.2).
+                    --}}
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div class="card p-4">
+                            <p class="font-medium">Dari rumah</p>
+                            <p class="mt-1 text-sm text-content-secondary">
+                                Isi formulir dan unggah foto syaratnya. Surat diambil di
+                                kantor desa setelah disetujui.
+                            </p>
+                            <a href="{{ route('warga.ajukan', ['jenis' => $jenis->code]) }}"
+                               class="touch-target mt-3 inline-flex items-center justify-center rounded-lg bg-accent px-5 font-medium text-content-inverse transition-colors hover:bg-accent-hover">
+                                Ajukan daring
+                            </a>
+                            @guest
+                                <p class="mt-2 text-xs text-content-tertiary">
+                                    Perlu akun warga.
+                                    <a href="{{ route('daftar') }}" class="text-accent hover:underline">Daftar di sini</a> —
+                                    gratis, diperiksa petugas satu hari kerja.
+                                </p>
+                            @endguest
+                        </div>
+
+                        <div class="card p-4">
+                            <p class="font-medium">Di kantor desa</p>
+                            <p class="mt-1 text-sm text-content-secondary">
+                                Tanpa akun. Bawa dokumen syarat, petugas yang mencatat
+                                pengajuan Anda dan memberi nomor tiket.
+                            </p>
+                            <a href="{{ route('portal.kontak') }}"
+                               class="touch-target mt-3 inline-flex items-center justify-center rounded-lg border border-line-strong bg-surface px-5 font-medium transition-colors hover:bg-surface-hover">
+                                Jam layanan
+                            </a>
+                        </div>
+                    </div>
+
+                    <ol class="mt-5 space-y-3">
                         @foreach ([
                             'Siapkan seluruh dokumen syarat di atas, asli dan fotokopinya.',
-                            'Datang ke kantor desa pada jam layanan dengan membawa dokumen tersebut.',
-                            'Petugas mencatat pengajuan Anda dan memberi NOMOR TIKET.',
-                            'Pantau statusnya sendiri lewat halaman Lacak Status Pengajuan menggunakan nomor tiket dan tanggal lahir pemohon.',
+                            'Ajukan daring dari halaman ini, atau datang ke kantor desa pada jam layanan.',
+                            'Anda menerima NOMOR TIKET begitu pengajuan tercatat.',
+                            'Pantau statusnya lewat halaman Lacak Status Pengajuan — atau dari daftar pengajuan di akun warga Anda.',
                             'Surat diambil di kantor desa setelah disetujui.',
                         ] as $nomor => $langkah)
                             <li class="flex gap-3">
@@ -75,24 +114,11 @@
                         @endforeach
                     </ol>
 
-                    {{--
-                      Pengajuan DARING belum dibuka di sini dengan sengaja.
-                      Menurut KEP-013 §2 pengajuan daring satu paket dengan
-                      registrasi dan verifikasi akun warga; tombol "Ajukan
-                      sekarang" sebelum akun warga ada akan menjanjikan layanan
-                      yang belum punya pemilik terverifikasi. Tombolnya muncul
-                      di sini pada bagian pengajuan daring sprint ini.
-                    --}}
-                    <div class="mt-5 flex flex-col gap-3 sm:flex-row">
-                        <a href="{{ route('surat.lacak') }}"
-                           class="touch-target inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 font-medium text-content-inverse transition-colors hover:bg-accent-hover">
-                            Lacak pengajuan saya
+                    <p class="mt-5 text-sm">
+                        <a href="{{ route('surat.lacak') }}" class="font-medium text-accent hover:underline">
+                            Lacak pengajuan dengan nomor tiket &rarr;
                         </a>
-                        <a href="{{ route('portal.kontak') }}"
-                           class="touch-target inline-flex items-center justify-center rounded-lg border border-line-strong bg-surface px-5 py-2.5 font-medium transition-colors hover:bg-surface-hover">
-                            Jam layanan &amp; lokasi kantor
-                        </a>
-                    </div>
+                    </p>
                 </section>
             </div>
 
