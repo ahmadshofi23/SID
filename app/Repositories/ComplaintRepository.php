@@ -206,6 +206,37 @@ final class ComplaintRepository extends GuardedRepository
             ->get();
     }
 
+    /**
+     * Pengaduan terbuka untuk kartu dashboard — FR-LAP-01, docs/07 §5.4.
+     *
+     * Yang TERLAMBAT didahulukan, lalu yang paling lama menunggu. Daftar
+     * pendek di dashboard hanya berguna bila lima barisnya adalah lima yang
+     * paling mendesak; diurutkan dari yang terbaru, ia justru menyembunyikan
+     * pengaduan yang sudah berminggu-minggu didiamkan.
+     *
+     * @return Collection<int, Complaint>
+     */
+    public function openForDashboard(int $limit = 5): Collection
+    {
+        $now = now();
+
+        return $this->scoped()
+            ->whereIn('status', Complaint::OPEN_STATUSES)
+            ->with(['region:id,name,path', 'assignee:id,name'])
+            ->orderByRaw(
+                'CASE WHEN (status = ? AND triage_due_at < ?) '
+                .'OR (status IN (?, ?) AND due_at < ?) THEN 0 ELSE 1 END',
+                [
+                    Complaint::STATUS_NEW, $now,
+                    Complaint::STATUS_ACCEPTED, Complaint::STATUS_IN_PROGRESS, $now,
+                ],
+            )
+            ->orderByRaw("FIELD(priority, 'tinggi', 'normal', 'rendah')")
+            ->orderBy('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
     public function findByTicket(string $ticket): ?Complaint
     {
         return $this->scoped()->where('ticket_number', $ticket)->first();

@@ -441,3 +441,70 @@ export interface ComplaintDetail extends ComplaintRow {
     allowed_transitions: ComplaintStatus[]
     timeline: ComplaintOfficerStep[]
 }
+
+/* ======================== Dashboard (Sprint 7) ========================= */
+
+export interface DashboardPopulation {
+    penduduk_aktif: number
+    penduduk_total: number
+    /** Null bila pengguna tidak berhak melihat kartu keluarga. */
+    keluarga: number | null
+    perubahan_bulan_ini: number | null
+}
+
+export interface DashboardLetters {
+    terbuka: number
+    terbit: number
+    terlambat: number
+}
+
+export interface DashboardComplaints {
+    terbuka: number
+    selesai: number
+    terlambat: number
+}
+
+export interface DashboardTrendMonth {
+    bulan: string
+    /** Sudah diformat server pada kalender desa, mis. "Okt 26". */
+    label: string
+    masuk: number
+    selesai: number
+}
+
+export interface DashboardSla {
+    total: number
+    rata_jam: number | null
+    tepat_waktu: number
+    persen_tepat: number | null
+}
+
+export interface DashboardTask {
+    id: string
+    ticket_number: string
+    letter_type: string
+    resident_name: string
+    status: LetterRequestStatus
+    status_label: string
+    is_overdue: boolean
+    submitted_at: string | null
+}
+
+/**
+ * Setiap bagian `null` berarti pengguna TIDAK BERHAK melihatnya — bukan nol.
+ * Layar menyembunyikan kartunya; menampilkannya bernilai nol akan menyatakan
+ * sesuatu yang salah, dan di dashboard pimpinan itu berakhir sebagai keputusan.
+ */
+export interface DashboardProps {
+    kependudukan: DashboardPopulation | null
+    layanan: DashboardLetters | null
+    pengaduan: DashboardComplaints | null
+    tren: { bulanan: DashboardTrendMonth[]; sla: DashboardSla } | null
+    perlu_tindakan: DashboardTask[] | null
+    pengaduan_terbuka: ComplaintRow[] | null
+    komposisi: {
+        total: number
+        piramida: { group: string; L: number | string; P: number | string }[]
+        computed_at: string | null
+    } | null
+}

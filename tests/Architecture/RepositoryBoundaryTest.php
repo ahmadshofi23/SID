@@ -166,6 +166,7 @@ final class RepositoryBoundaryTest extends TestCase
         $scopedTypes = [
             'ResidentRepository', 'FamilyRepository', 'ComplaintRepository',
             'ResidentService', 'FamilyService', 'RegionService', 'ComplaintService',
+            'DashboardService',
             'AccessScope',
         ];
 

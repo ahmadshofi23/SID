@@ -5,33 +5,26 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Auth\AccessScope;
-use App\Repositories\FamilyRepository;
-use App\Repositories\ResidentRepository;
+use App\Services\Dashboard\DashboardService;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * Dashboard — FR-LAP-01, FR-LAP-02, UC-17, docs/07 §5.4.
+ *
+ * Isinya disusun DashboardService; yang tersisa di sini hanyalah merender.
+ * Pemisahan itu ada karena dashboard membaca dari lima repository sekaligus,
+ * dan aturan "siapa boleh melihat angka apa" terlalu panjang untuk hidup di
+ * sebuah controller — di sana ia akan ditambah sepotong demi sepotong setiap
+ * kali ada kartu baru, sampai tidak ada lagi yang dapat membacanya utuh.
+ *
+ * Tanpa konstruktor untuk dependensi ber-AccessScope (KEP-009): DashboardService
+ * membawa repository berlingkup, sehingga ia WAJIB lewat injeksi method.
+ */
 final class DashboardController extends Controller
 {
-    public function __invoke(
-        AccessScope $scope,
-        ResidentRepository $residents,
-        FamilyRepository $families,
-    ): Response {
-        /*
-         * Angka hanya dihitung bila pengguna memang berhak melihatnya.
-         * Warga dan peran tanpa izin kependudukan mendapat `null`, dan kartu
-         * KPI tidak ditampilkan sama sekali — bukan ditampilkan bernilai nol,
-         * yang akan menyesatkan.
-         *
-         * Seluruh hitungan melewati repository, sehingga otomatis terbatas
-         * pada wilayah/keluarga pengguna (docs/04-arsitektur.md §4.1).
-         */
-        $stats = $scope->can('penduduk.lihat') ? [
-            'residents_active' => $residents->countActive(),
-            'residents_total' => $residents->countAll(),
-            'families' => $scope->can('keluarga.lihat') ? $families->countAll() : 0,
-        ] : null;
-
-        return Inertia::render('Dashboard', ['stats' => $stats]);
+    public function __invoke(AccessScope $scope, DashboardService $dashboard): Response
+    {
+        return Inertia::render('Dashboard', $dashboard->forScope($scope));
     }
 }

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Models\LetterRequest;
+use App\Models\Role;
+use App\Support\VillageTime;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 /**
  * Satu-satunya pintu ke tabel `letter_requests`.
@@ -183,6 +186,179 @@ final class LetterRequestRepository extends GuardedRepository
             ->whereNotNull('due_at')
             ->where('due_at', '<', now())
             ->count();
+    }
+
+    /**
+     * Tren layanan 12 bulan — FR-LAP-01.
+     *
+     * DUA deret dalam satu kueri per deret, bukan satu kueri per bulan: dua
+     * belas bulan × dua deret berarti 24 perjalanan ke basis data untuk satu
+     * kartu dashboard, dan dashboard adalah halaman yang dibuka paling sering.
+     *
+     * Dikelompokkan pada ZONA DESA, bukan UTC (KEP-010). Pengajuan yang masuk
+     * pukul 08.00 WIB tanggal 1 tersimpan sebagai 01.00 UTC tanggal 1 — masih
+     * sama; tetapi yang masuk pukul 06.00 WIB tanggal 1 tersimpan sebagai
+     * 23.00 UTC tanggal SEBELUMNYA, dan dikelompokkan mentah ia akan jatuh di
+     * bulan yang salah setiap awal bulan.
+     *
+     * @return list<array{bulan: string, label: string, masuk: int, selesai: int}>
+     */
+    public function monthlyTrend(int $months = 12): array
+    {
+        $zone = VillageTime::zone();
+        $since = VillageTime::local(now())->startOfMonth()->subMonths($months - 1)->utc();
+
+        $masuk = $this->countByMonth('submitted_at', $since, $zone);
+        $selesai = $this->countByMonth('completed_at', $since, $zone);
+
+        $result = [];
+        $cursor = VillageTime::local($since);
+
+        for ($i = 0; $i < $months; $i++) {
+            $key = $cursor->format('Y-m');
+
+            $result[] = [
+                'bulan' => $key,
+                'label' => $cursor->locale('id')->translatedFormat('M y'),
+                'masuk' => $masuk[$key] ?? 0,
+                'selesai' => $selesai[$key] ?? 0,
+            ];
+
+            $cursor = $cursor->copy()->addMonth();
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, int> "Y-m" => jumlah
+     */
+    private function countByMonth(string $column, Carbon $since, string $zone): array
+    {
+        /** @var array<string, int> */
+        return $this->scoped()
+            ->whereNotNull($column)
+            ->where($column, '>=', $since)
+            ->toBase()
+            ->selectRaw(
+                "DATE_FORMAT(CONVERT_TZ({$column}, '+00:00', ?), '%Y-%m') AS bulan, COUNT(*) AS jumlah",
+                [$this->tzOffset($zone)]
+            )
+            ->groupBy('bulan')
+            ->pluck('jumlah', 'bulan')
+            ->map(fn ($v): int => (int) $v)
+            ->all();
+    }
+
+    /**
+     * Zona desa sebagai selisih "+07:00".
+     *
+     * MySQL `CONVERT_TZ` menerima nama zona seperti 'Asia/Jakarta' HANYA bila
+     * tabel zona waktunya sudah dimuat (`mysql_tzinfo_to_sql`), dan pada
+     * pemasangan bawaan ia TIDAK dimuat — hasilnya NULL tanpa galat, sehingga
+     * seluruh grafik tren menjadi kosong tanpa ada yang mengerti mengapa.
+     * Selisih numerik selalu bekerja.
+     *
+     * Dihitung dari tanggal hari ini, bukan ditetapkan di kode: Indonesia
+     * memang tidak memakai waktu musim panas, tetapi desa di WITA/WIT
+     * memakai selisih yang berbeda.
+     */
+    private function tzOffset(string $zone): string
+    {
+        return now()->setTimezone($zone)->format('P');
+    }
+
+    /**
+     * Ketepatan SLA layanan — FR-LAP-01, FR-LAP-05.
+     *
+     * Dihitung dari surat yang SUDAH SELESAI saja. Memasukkan yang masih
+     * berjalan akan membuat angka "rata-rata waktu selesai" turun setiap kali
+     * ada pengajuan baru masuk — tampak membaik justru ketika antrean
+     * menumpuk.
+     *
+     * @return array{total: int, rata_jam: float|null, tepat_waktu: int, persen_tepat: float|null}
+     */
+    public function slaPerformance(int $months = 12): array
+    {
+        $since = VillageTime::local(now())->startOfMonth()->subMonths($months - 1)->utc();
+
+        $row = $this->scoped()
+            ->whereNotNull('completed_at')
+            ->whereNotNull('submitted_at')
+            ->where('completed_at', '>=', $since)
+            ->toBase()
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, submitted_at, completed_at)) AS rata_menit')
+            ->selectRaw('SUM(CASE WHEN due_at IS NULL OR completed_at <= due_at THEN 1 ELSE 0 END) AS tepat')
+            ->first();
+
+        $total = (int) ($row->total ?? 0);
+        $tepat = (int) ($row->tepat ?? 0);
+
+        return [
+            'total' => $total,
+            'rata_jam' => $total === 0 ? null : round(((float) $row->rata_menit) / 60, 1),
+            'tepat_waktu' => $tepat,
+            'persen_tepat' => $total === 0 ? null : round($tepat / $total * 100, 1),
+        ];
+    }
+
+    /**
+     * Pengajuan yang MENUNGGU TINDAKAN PENGGUNA INI — FR-LAP-02, docs/07 §5.4.
+     *
+     * Inti dari keputusan desain dashboard pimpinan: yang ditampilkan adalah
+     * pekerjaan yang menunggu DIRINYA, bukan sekadar angka. Tanpa ini,
+     * persetujuan menumpuk dan sasaran O-2 (SLA 1 jam) tidak tercapai.
+     *
+     * Penyaringan kewenangan dilakukan DI PHP, bukan di SQL, dan itu disengaja:
+     * peran yang berwenang per tahap tersimpan di dalam JSON `approval_flow`
+     * milik jenis surat, dan menuliskannya sebagai kueri JSON MySQL akan
+     * menjadi ekspresi yang tidak dapat dibaca siapa pun DAN menduplikasi
+     * aturan yang sudah ada di LetterType::rolesForStep(). Aturan kewenangan
+     * yang ditulis dua kali akan berbeda pelan-pelan — biasanya pada sisi yang
+     * lebih longgar.
+     *
+     * Jumlah baris yang disaring terbatas: hanya pengajuan yang masih terbuka,
+     * dan antrean desa berukuran puluhan, bukan ribuan.
+     *
+     * @return list<LetterRequest>
+     */
+    public function awaitingMyAction(int $limit = 5): array
+    {
+        $scope = $this->scope;
+        $isAdmin = $scope->hasRole(Role::ADMIN_DESA);
+
+        $candidates = $this->scoped()
+            ->whereIn('status', [LetterRequest::STATUS_SUBMITTED, LetterRequest::STATUS_VERIFIED])
+            ->with(['letterType', 'resident:id,full_name,nik_masked'])
+            ->orderBy('submitted_at')
+            ->limit(100)
+            ->get();
+
+        $mine = $candidates->filter(function (LetterRequest $request) use ($scope, $isAdmin): bool {
+            /*
+             * Status `diverifikasi` berarti menunggu PENERBITAN, bukan
+             * pemeriksaan lagi — dan itu kewenangan Kepala Desa atau Admin
+             * Desa (lihat LetterRequestService::guardIssueAuthority()).
+             */
+            if ($request->status === LetterRequest::STATUS_VERIFIED) {
+                return $isAdmin || $scope->hasRole(Role::KEPALA_DESA);
+            }
+
+            if ($isAdmin) {
+                return true;
+            }
+
+            foreach ($request->letterType->rolesForStep($request->current_step) as $role) {
+                if ($scope->hasRole($role)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        return $mine->take($limit)->values()->all();
     }
 
     /**
