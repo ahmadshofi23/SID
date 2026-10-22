@@ -27,6 +27,7 @@ use App\Http\Controllers\Population\ResidentController;
 use App\Http\Controllers\Population\StatisticsController;
 use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Portal\PostController;
+use App\Http\Controllers\Portal\PwaController;
 use App\Http\Controllers\Portal\SitemapController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -78,6 +79,16 @@ Route::controller(PortalController::class)->group(function (): void {
  | berubah dari panel petugas, dan baris `Sitemap:` menuntut URL absolut yang
  | tidak diketahui berkas di public/. Lihat SitemapController.
  */
+/*
+ | Aplikasi web progresif (docs/03 §2.3, docs/07 §8). Manifest dibangkitkan
+ | karena nama desa ada di basis data; halaman luring berupa rute biasa agar
+ | service worker dapat meng-cache-nya lewat URL yang sama dengan yang
+ | dilihat pengguna. Service worker sendiri berkas statis di public/sw.js —
+ | ia WAJIB disajikan dari akar agar lingkupnya mencakup seluruh situs.
+ */
+Route::get('manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
+Route::get('luring', [PwaController::class, 'offline'])->name('pwa.luring');
+
 Route::get('sitemap.xml', [SitemapController::class, 'sitemap'])->name('portal.sitemap');
 Route::get('robots.txt', [SitemapController::class, 'robots'])->name('portal.robots');
 

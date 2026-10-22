@@ -11,15 +11,19 @@ use Illuminate\Database\Eloquent\Model;
  */
 /**
  * @property int $id
- * @property string $code
- * @property string $name
- * @property string $district
- * @property string $regency
- * @property string $province
  *
- * MENGAPA NULLABLE: current() mengembalikan instance KOSONG bila baris
- * profil desa belum ada (pemasangan baru, sebelum seeder dijalankan),
- * sehingga atribut apa pun dapat bernilai null walau kolomnya NOT NULL.
+ * MENGAPA SEMUANYA NULLABLE, walau kolomnya NOT NULL: current()
+ * mengembalikan instance KOSONG bila baris profil desa belum ada
+ * (pemasangan baru, sebelum seeder dijalankan), sehingga atribut apa pun
+ * dapat bernilai null. Sempat ditulis non-nullable untuk lima kolom
+ * pertama, dan akibatnya analisis statis menganggap pemeriksaan null di
+ * pemanggil sebagai kode mati — padahal justru pemeriksaan itulah yang
+ * mencegah halaman kosong pada pemasangan baru.
+ * @property string|null $code
+ * @property string|null $name
+ * @property string|null $district
+ * @property string|null $regency
+ * @property string|null $province
  * @property string|null $timezone
  * @property string|null $address
  * @property string|null $postal_code

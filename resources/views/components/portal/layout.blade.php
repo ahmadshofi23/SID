@@ -93,6 +93,7 @@
     <meta name="twitter:card" content="summary">
 
     @include('partials.tema')
+    @include('partials.pwa')
 
     @vite(['resources/css/app.css'])
 
