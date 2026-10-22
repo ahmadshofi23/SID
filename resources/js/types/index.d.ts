@@ -391,3 +391,53 @@ export interface ComplaintReceipt {
     title: string
     triage_due_at: string | null
 }
+
+/** Baris antrean pengaduan untuk petugas — UC-14. */
+export interface ComplaintRow {
+    id: string
+    ticket_number: string
+    status: ComplaintStatus
+    status_label: string
+    priority: 'rendah' | 'normal' | 'tinggi'
+    priority_label: string
+    category: string
+    title: string
+    is_anonymous: boolean
+    /** "Anonim" bila anonim — jangan diganti string kosong. */
+    reporter_label: string
+    region: string | null
+    location_text: string | null
+    assignee: string | null
+    assigned_to: string | null
+    is_open: boolean
+    is_overdue: boolean
+    created_at: string | null
+    due_at: string | null
+    /** Disusun server pada kalender desa — jangan dihitung ulang di peramban. */
+    due_label: string | null
+}
+
+export interface ComplaintOfficerStep extends ComplaintStep {
+    actor_name: string | null
+    /** Catatan internal (false) tidak pernah dibaca pelapor. */
+    is_visible_to_reporter: boolean
+}
+
+/**
+ * Detail pengaduan untuk petugas.
+ *
+ * `tracking_code` TIDAK ada di sini dan tidak boleh ditambahkan: ia rahasia
+ * milik pelapor, bukan milik desa.
+ */
+export interface ComplaintDetail extends ComplaintRow {
+    body: string
+    reporter_phone: string | null
+    latitude: string | null
+    longitude: string | null
+    region_path: string | null
+    triage_due_at: string | null
+    assigned_at: string | null
+    is_published: boolean
+    allowed_transitions: ComplaintStatus[]
+    timeline: ComplaintOfficerStep[]
+}

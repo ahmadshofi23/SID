@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\Citizen\CitizenVerificationController;
 use App\Http\Controllers\Citizen\RegistrationController;
 use App\Http\Controllers\Citizen\WargaController;
+use App\Http\Controllers\Complaint\ComplaintController;
 use App\Http\Controllers\Complaint\PublicComplaintController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Letter\LetterAttachmentController;
@@ -428,6 +429,54 @@ Route::middleware('auth')->group(function (): void {
         Route::get('pengaduan', [WargaController::class, 'pengaduan'])->name('warga.pengaduan');
         Route::get('pengaduan/{id}', [WargaController::class, 'pengaduanDetail'])
             ->name('warga.pengaduan.detail');
+    });
+
+    /* ------------------- Pengaduan: panel petugas (Sprint 7) ------------
+     | UC-14, FR-PGD-03 s.d. FR-PGD-07.
+     |
+     | TIGA izin yang berbeda, mengikuti matriks RBAC docs/03 §4.9:
+     |   - `pengaduan.lihat` membuka antrean dan detail. Kepala Desa ("R") dan
+     |     Kepala Dusun ("R(wilayah)") berhenti di sini — keduanya membaca,
+     |     tidak menindaklanjuti.
+     |   - `pengaduan.tindaklanjut` mengubah status dan mencatat tindak lanjut.
+     |   - `pengaduan.tugaskan` melimpahkan ke petugas lain.
+     |
+     | Apa yang DILIHAT masing-masing tetap dibatasi ComplaintRepository, bukan
+     | oleh rute: Kepala Dusun yang membuka pengaduan dusun lain mendapat 404,
+     | bukan 403 (docs/06 §4).
+     */
+    /*
+     | DI BAWAH `pengaduan/antrean`, BUKAN `pengaduan` saja — dan ini bukan
+     | selera penamaan melainkan tabrakan yang sudah terjadi sekali.
+     |
+     | `GET /pengaduan` sudah dipakai FORMULIR PUBLIK di atas. Laravel
+     | memetakan rute berdasarkan pasangan metode+URI, sehingga pendaftaran
+     | yang belakangan MENGGANTI yang terdahulu tanpa satu pun peringatan:
+     | antrean petugas sempat menelan formulir pengaduan warga, dan yang
+     | tersisa bagi warga adalah halaman yang menuntut login.
+     |
+     | Yang pendek diberikan kepada WARGA, bukan kepada petugas. Warga
+     | mengetik atau membaca `/pengaduan` dari poster dan dari halaman portal;
+     | petugas sampai ke antreannya lewat menu, sehingga panjang URL-nya tidak
+     | menjadi beban siapa pun.
+     |
+     | Prefiks ini sekaligus mengeluarkan `{id}` dari ruang nama `/pengaduan/*`,
+     | yang di sana sudah ada `/pengaduan/lacak` — tanpa itu, keduanya hanya
+     | dipisahkan oleh urutan pendaftaran.
+     */
+    Route::prefix('pengaduan/antrean')->group(function (): void {
+        Route::get('/', [ComplaintController::class, 'index'])
+            ->middleware('izin:pengaduan.lihat')->name('pengaduan.index');
+        Route::get('{id}', [ComplaintController::class, 'show'])
+            ->middleware('izin:pengaduan.lihat')->name('pengaduan.detail');
+        Route::post('{id}/status', [ComplaintController::class, 'transition'])
+            ->middleware('izin:pengaduan.tindaklanjut')->name('pengaduan.status');
+        Route::post('{id}/tindak-lanjut', [ComplaintController::class, 'followUp'])
+            ->middleware('izin:pengaduan.tindaklanjut')->name('pengaduan.tindak-lanjut');
+        Route::post('{id}/terbitkan', [ComplaintController::class, 'publish'])
+            ->middleware('izin:pengaduan.tindaklanjut')->name('pengaduan.terbitkan');
+        Route::post('{id}/tugaskan', [ComplaintController::class, 'assign'])
+            ->middleware('izin:pengaduan.tugaskan')->name('pengaduan.tugaskan');
     });
 
     /* ---------------- Verifikasi akun warga (Sprint 6) -----------------

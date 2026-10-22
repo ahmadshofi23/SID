@@ -196,8 +196,15 @@ final class ComplaintService
         $resolution = trim($resolution);
 
         if ($resolution === '') {
+            /*
+             * Kuncinya `note`, bukan `resolution`, meski kolomnya bernama
+             * resolution: kunci pesan validasi harus cocok dengan NAMA ISIAN
+             * yang dikirim formulir, bukan dengan nama kolom basis data. Yang
+             * tidak cocok tidak ditampilkan di mana pun — petugas hanya
+             * melihat tombol yang ditekan lalu tidak terjadi apa-apa.
+             */
             throw ValidationException::withMessages([
-                'resolution' => 'Tuliskan hasil penanganannya. Pelapor membaca kalimat ini.',
+                'note' => 'Tuliskan hasil penanganannya. Pelapor membaca kalimat ini.',
             ]);
         }
 
@@ -223,8 +230,9 @@ final class ComplaintService
         $reason = trim($reason);
 
         if ($reason === '') {
+            // Kunci `note` dengan alasan yang sama seperti pada resolve().
             throw ValidationException::withMessages([
-                'resolution' => 'Pengaduan tidak dapat ditolak tanpa alasan tertulis.',
+                'note' => 'Pengaduan tidak dapat ditolak tanpa alasan tertulis.',
             ]);
         }
 

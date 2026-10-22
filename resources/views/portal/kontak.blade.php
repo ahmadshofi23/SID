@@ -110,5 +110,54 @@
             dalam 2 hari kerja, dan tindak lanjutnya dapat dipantau dengan kode pelacakan di
             <a class="font-medium text-accent hover:underline" href="{{ route('pengaduan.lacak') }}">halaman pelacakan pengaduan</a>.
         </x-alert>
+
+        {{--
+          Pengaduan yang SUDAH DITANGANI — FR-PGD-07.
+
+          Ini bukan hiasan. Kanal pengaduan yang tidak pernah memperlihatkan
+          hasil akan dianggap kotak kosong, dan warga kembali menyampaikan
+          keluhannya lewat obrolan yang tidak tercatat di mana pun. Yang
+          ditampilkan hanya kategori, judul, dan hasil penanganannya — tanpa
+          lokasi, titik koordinat, maupun pelapor (lihat
+          ComplaintPresenter::publicSummary()), karena "jalan rusak di depan
+          rumah Pak Sumadi" yang terbit di situs desa menunjuk satu rumah
+          tertentu, dan itu bukan keterbukaan melainkan penyingkapan.
+
+          Seluruh baris di sini DIPILIH SATU PER SATU oleh petugas; tidak ada
+          pengaduan yang terbit dengan sendirinya hanya karena selesai.
+        --}}
+        @if (count($pengaduanSelesai) > 0)
+            <section class="mt-8" aria-labelledby="pengaduan-selesai">
+                <h2 id="pengaduan-selesai" class="text-lg font-semibold">Pengaduan yang sudah ditangani</h2>
+                <p class="mt-1 text-sm text-content-secondary">
+                    Sebagian pengaduan warga yang sudah selesai ditindaklanjuti dan
+                    disetujui untuk dipublikasikan.
+                </p>
+
+                <ul class="mt-4 space-y-3">
+                    @foreach ($pengaduanSelesai as $pengaduan)
+                        <li class="rounded-lg border border-line bg-surface p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="font-medium">{{ $pengaduan['title'] }}</p>
+                                    <p class="mt-0.5 text-xs text-content-tertiary">
+                                        {{ $pengaduan['category'] }}
+                                        @if ($pengaduan['resolved_at'])
+                                            · Selesai {{ $pengaduan['resolved_at'] }}
+                                        @endif
+                                    </p>
+                                </div>
+                                <span class="shrink-0 rounded-md bg-success-soft px-2 py-0.5 text-xs font-medium text-success">
+                                    Selesai
+                                </span>
+                            </div>
+                            @if ($pengaduan['resolution'])
+                                <p class="mt-2 text-sm text-content-secondary">{{ $pengaduan['resolution'] }}</p>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+        @endif
     </div>
 </x-portal.layout>

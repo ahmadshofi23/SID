@@ -5,6 +5,7 @@ import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
     ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
     Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search, Newspaper, Globe, UserCheck,
+    Megaphone,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
@@ -100,6 +101,20 @@ const groups = computed<NavGroup[]>(() => [
               pattern: '/surat/lacak', icon: Search, show: can('surat.lihat') },
             { label: 'Jenis Surat', route: '/jenis-surat',
               pattern: '/jenis-surat', icon: Settings2, show: can('jenis_surat.lihat') },
+        ],
+    },
+    {
+        /*
+         * Kelompok sendiri, bukan diselipkan di bawah "Persuratan": keduanya
+         * sama-sama antrean pekerjaan, tetapi pemegang izinnya berbeda —
+         * Kasi Kesejahteraan menindaklanjuti pengaduan tanpa menyentuh surat.
+         * Menaruhnya di kelompok persuratan membuat kelompok itu muncul utuh
+         * bagi orang yang tidak punya satu pun izin surat.
+         */
+        label: 'Pengaduan',
+        items: [
+            { label: 'Antrean Pengaduan', route: '/pengaduan/antrean',
+              pattern: '/pengaduan/antrean', icon: Megaphone, show: can('pengaduan.lihat') },
         ],
     },
     {

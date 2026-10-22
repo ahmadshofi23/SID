@@ -140,6 +140,146 @@ final class ComplaintPresenter
         ];
     }
 
+    /**
+     * Baris antrean petugas — UC-14.
+     *
+     * Memuat identitas pelapor BILA ADA, dan itu memang perlu: petugas yang
+     * menindaklanjuti sering harus menelepon pelapornya. Pada pengaduan
+     * anonim yang keluar adalah kata "Anonim" (Complaint::reporterLabel()),
+     * bukan string kosong yang terbaca seperti data hilang.
+     *
+     * Nomor telepon TIDAK ikut ke baris daftar — hanya ke halaman detail.
+     * Daftar antrean dibuka di layar yang sering terlihat orang lain di meja
+     * pelayanan, dan nomor telepon pelapor pengaduan tentang tetangganya
+     * tidak perlu terbaca siapa pun yang lewat.
+     *
+     * @return array<string, mixed>
+     */
+    public static function row(Complaint $complaint): array
+    {
+        return [
+            'id' => $complaint->id,
+            'ticket_number' => $complaint->ticket_number,
+            'status' => $complaint->status,
+            'status_label' => Complaint::statusLabels()[$complaint->status] ?? $complaint->status,
+            'priority' => $complaint->priority,
+            'priority_label' => Complaint::priorityLabels()[$complaint->priority] ?? $complaint->priority,
+            'category' => self::categoryLabel($complaint),
+            'title' => $complaint->title,
+            'is_anonymous' => $complaint->is_anonymous,
+            'reporter_label' => $complaint->reporterLabel(),
+            'region' => $complaint->region?->name,
+            'location_text' => $complaint->location_text,
+            'assignee' => $complaint->assignee?->name,
+            'assigned_to' => $complaint->assigned_to,
+            'is_open' => $complaint->isOpen(),
+            'is_overdue' => $complaint->isOverdue(),
+            'created_at' => self::villageDateTime($complaint->created_at),
+            'due_at' => self::villageDate($complaint->activeDueAt()),
+            /*
+             * Label tenggat disusun DI SERVER, bukan di peramban, dengan
+             * alasan yang sama seperti pada pengajuan surat: sisa waktu harus
+             * dihitung pada kalender desa, dan peramban petugas memakai zona
+             * waktu perangkatnya sendiri — selisih tujuh jam cukup membuat
+             * "besok malam" terbaca "sisa 2 hari".
+             */
+            'due_label' => self::dueLabel($complaint),
+        ];
+    }
+
+    /**
+     * Halaman detail petugas — UC-14.
+     *
+     * Di sinilah SELURUH isi pengaduan keluar, termasuk nomor telepon pelapor
+     * dan catatan koordinasi internal yang tidak dibaca pelapor. Yang tetap
+     * TIDAK pernah keluar bahkan di sini: `tracking_code`. Ia rahasia milik
+     * pelapor, bukan milik desa — petugas yang dapat membacanya akan dapat
+     * membuka pengaduan anonim siapa pun lewat halaman publik, dan pada
+     * pengaduan tentang perangkat desa itu justru pihak yang diadukan.
+     *
+     * @return array<string, mixed>
+     */
+    public static function forOfficer(Complaint $complaint): array
+    {
+        return [
+            ...self::row($complaint),
+            'body' => $complaint->body,
+            /*
+             * Identitas pelapor pada pengaduan anonim memang TIDAK ADA di
+             * basis data (RULE-09), jadi yang terkirim null bukan karena
+             * disaring di sini. Operator ?: tetap dipasang agar tidak ada
+             * jalur yang mengirimkannya bila kelak kolomnya terisi keliru.
+             */
+            'reporter_phone' => $complaint->is_anonymous ? null : $complaint->reporter_phone,
+            'latitude' => $complaint->latitude,
+            'longitude' => $complaint->longitude,
+            'region_path' => $complaint->region?->displayPath(),
+            /*
+             * `due_at` DITIMPA di sini dengan kolom aslinya, menggantikan
+             * tenggat-yang-berlaku dari row().
+             *
+             * Keduanya benar di tempatnya masing-masing: antrean menampilkan
+             * satu tanggal, yaitu yang sedang ditunggu, sedangkan halaman
+             * detail menampilkan DUA baris bernama "Batas triase" dan "Batas
+             * penyelesaian". Tanpa penimpaan ini, pengaduan yang masih `baru`
+             * memperlihatkan tanggal triase pada baris "Batas penyelesaian" —
+             * dua baris dengan tanggal sama dan salah satunya berbohong.
+             * Terlihat saat mencoba layarnya di peramban.
+             */
+            'due_at' => self::villageDate($complaint->due_at),
+            'triage_due_at' => self::villageDate($complaint->triage_due_at),
+            'assigned_at' => self::villageDateTime($complaint->assigned_at),
+            'is_published' => $complaint->is_published,
+            'allowed_transitions' => Complaint::TRANSITIONS[$complaint->status] ?? [],
+            /*
+             * SELURUH riwayat, termasuk catatan internal — berbeda dari
+             * tracking() yang hanya mengirim yang ditandai terlihat pelapor.
+             * Penandanya ikut, agar layar dapat menunjukkan mana yang dibaca
+             * pelapor: petugas yang tidak tahu catatannya terbaca warga akan
+             * menuliskan dugaan yang belum terbukti di sana.
+             */
+            'timeline' => array_map(
+                self::officerStep(...),
+                $complaint->actions->sortBy('created_at')->values()->all(),
+            ),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function officerStep(ComplaintAction $action): array
+    {
+        return [
+            ...self::step($action),
+            'actor_name' => $action->actor_name,
+            'is_visible_to_reporter' => $action->is_visible_to_reporter,
+        ];
+    }
+
+    /**
+     * "Jatuh tempo besok" / "Terlambat 3 hari" — dihitung pada kalender desa.
+     *
+     * Dalam HARI KALENDER, bukan pembulatan selisih jam: tenggat besok pukul
+     * 23.59 adalah "besok", apa pun jam berapa petugas membukanya.
+     */
+    private static function dueLabel(Complaint $complaint): ?string
+    {
+        $due = $complaint->activeDueAt();
+
+        if ($due === null || ! $complaint->isOpen()) {
+            return null;
+        }
+
+        $hari = VillageTime::local(now())->startOfDay()
+            ->diffInDays(VillageTime::local($due)->startOfDay());
+
+        return match (true) {
+            $hari < 0 => 'Terlambat '.abs((int) $hari).' hari',
+            $hari === 0.0 => 'Jatuh tempo hari ini',
+            $hari === 1.0 => 'Jatuh tempo besok',
+            default => 'Sisa '.(int) $hari.' hari',
+        };
+    }
+
     /** @return array<string, mixed> */
     private static function step(ComplaintAction $action): array
     {

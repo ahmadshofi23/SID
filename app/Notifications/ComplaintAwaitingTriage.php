@@ -36,7 +36,7 @@ final class ComplaintAwaitingTriage extends Notification
                 .$this->triageLabel().'.',
             'tiket' => $this->complaint->ticket_number,
             'status' => $this->complaint->status,
-            'tautan' => '/pengaduan/'.$this->complaint->id,
+            'tautan' => '/pengaduan/antrean/'.$this->complaint->id,
         ];
     }
 

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ComplaintPresenter;
 use App\Models\Post;
+use App\Repositories\ComplaintRepository;
 use App\Repositories\FamilyRepository;
 use App\Services\Population\StatisticsService;
 use App\Services\Portal\PortalService;
@@ -101,9 +103,31 @@ final class PortalController extends Controller
         ]);
     }
 
-    public function kontak(): View
+    public function kontak(ComplaintRepository $complaints): View
     {
-        return view('portal.kontak');
+        return view('portal.kontak', [
+            /*
+             * Ringkasan pengaduan yang SUDAH SELESAI dan disetujui terbit —
+             * FR-PGD-07.
+             *
+             * Ditempatkan di halaman kontak, bukan halaman sendiri, karena di
+             * sinilah warga mencari cara menyampaikan keluhan. Melihat
+             * pengaduan orang lain yang benar-benar ditangani adalah satu-
+             * satunya bukti yang membuat orang mau menuliskan keluhannya;
+             * kanal pengaduan yang tidak pernah memperlihatkan hasil akan
+             * dianggap kotak kosong, dan warga kembali menyampaikannya lewat
+             * obrolan yang tidak tercatat di mana pun.
+             *
+             * published() tidak berlingkup, dan memang tidak boleh: halaman
+             * ini dibaca tamu. Yang menjaganya ada di kuerinya — sudah selesai
+             * DAN sudah ditandai terbit satu per satu oleh petugas — serta di
+             * ComplaintPresenter::publicSummary(), yang tidak melewatkan
+             * lokasi, koordinat, maupun pelapor.
+             */
+            'pengaduanSelesai' => $complaints->published(5)
+                ->map(ComplaintPresenter::publicSummary(...))
+                ->all(),
+        ]);
     }
 
     /* ======================= Konten portal (Bagian 2) ====================== */
