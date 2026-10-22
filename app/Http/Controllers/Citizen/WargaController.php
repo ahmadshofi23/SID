@@ -6,11 +6,13 @@ namespace App\Http\Controllers\Citizen;
 
 use App\Auth\AccessScope;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ComplaintPresenter;
 use App\Http\Resources\LetterRequestPresenter;
 use App\Models\LetterAttachment;
 use App\Models\LetterRequest;
 use App\Models\LetterType;
 use App\Models\Resident;
+use App\Repositories\ComplaintRepository;
 use App\Repositories\LetterRequestRepository;
 use App\Repositories\ResidentRepository;
 use App\Services\Letter\DynamicFormValidator;
@@ -100,6 +102,43 @@ final class WargaController extends Controller
                     'original_name' => $a->original_name,
                     'requirement_index' => $a->requirement_index,
                 ])->values()->all(),
+        ]);
+    }
+
+    /**
+     * Pengaduan milik akun sendiri — FR-PGD-02, UC-13.
+     *
+     * HANYA pengaduan yang ia laporkan sendiri, bukan pengaduan satu KK —
+     * berbeda dari daftar pengajuan surat di atasnya. Penyaringannya ada di
+     * ComplaintRepository::applyScope() beserta alasannya: pengaduan tentang
+     * anggota keluarga akan terbuka justru kepada orang yang diadukan bila
+     * lingkupnya keluarga.
+     */
+    public function pengaduan(Request $request, ComplaintRepository $complaints): Response
+    {
+        $page = $complaints->queue([
+            'status' => $request->string('status')->toString(),
+        ], perPage: 20);
+
+        return Inertia::render('Warga/Pengaduan/Index', [
+            'pengaduan' => [
+                'data' => array_map(ComplaintPresenter::forCitizen(...), $page->items()),
+                'prev_url' => $page->previousPageUrl(),
+                'next_url' => $page->nextPageUrl(),
+                'count' => count($page->items()),
+            ],
+            'filters' => ['status' => $request->string('status')->toString()],
+        ]);
+    }
+
+    public function pengaduanDetail(string $id, ComplaintRepository $complaints): Response
+    {
+        // findOrFail() repository: pengaduan orang lain -> 404, bukan 403.
+        $complaint = $complaints->findOrFail($id);
+        $complaint->load('actions');
+
+        return Inertia::render('Warga/Pengaduan/Detail', [
+            'pengaduan' => ComplaintPresenter::forCitizen($complaint),
         ]);
     }
 

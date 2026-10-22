@@ -25,6 +25,15 @@ use Illuminate\Http\Response;
  * administrasi, halaman pelacakan, dan halaman verifikasi surat tidak: dua
  * yang terakhir tidak berarti apa pun tanpa nomor tiket atau kode verifikasi,
  * dan mengindeksnya hanya menyebarkan URL yang akan dicoba-coba.
+ *
+ * FORMULIR PENGADUAN (`/pengaduan`) JUGA TIDAK MASUK, dan itu bukan kelalaian
+ * meski ia halaman layanan yang memang dicari warga. Ia dirender Inertia
+ * (KEP-016 §5: formulir dengan keadaan validasi), sehingga perayap yang tidak
+ * menjalankan JavaScript akan mengindeksnya sebagai halaman KOSONG — hasil
+ * pencarian "pengaduan desa" yang menuju halaman putih lebih buruk daripada
+ * tidak muncul sama sekali. Jalur masuknya tetap terbaca perayap karena
+ * `portal.beranda` dan `portal.kontak` — keduanya Blade dan keduanya
+ * terindeks — menautkannya.
  */
 final class SitemapController extends Controller
 {

@@ -43,7 +43,7 @@ use Illuminate\Support\Str;
  * @property Carbon|null $resolved_at
  * @property string|null $resolution
  * @property bool $is_published
- * @property string|null $submitted_ip
+ * @property string|null $submitted_ip_hash
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read User|null $reporter

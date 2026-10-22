@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
-import { Landmark, House, FilePlus2, FileClock, Users, LogOut, Sun, Moon } from '@lucide/vue'
+import { Landmark, House, FilePlus2, FileClock, Megaphone, Users, LogOut, Sun, Moon } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
 import FlashMessages from '@/Components/FlashMessages.vue'
@@ -29,6 +29,7 @@ const menu = [
     { label: 'Beranda', href: '/warga', icon: House },
     { label: 'Ajukan', href: '/warga/ajukan', icon: FilePlus2 },
     { label: 'Pengajuan', href: '/warga/pengajuan', icon: FileClock },
+    { label: 'Pengaduan', href: '/warga/pengaduan', icon: Megaphone },
     { label: 'Keluarga', href: '/warga/keluarga', icon: Users },
 ]
 

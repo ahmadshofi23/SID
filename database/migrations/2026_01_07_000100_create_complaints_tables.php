@@ -79,14 +79,34 @@ return new class extends Migration
                 ->comment('Ringkasan terbit ke portal — opt-in per kasus, FR-PGD-07');
 
             /*
-             * IP penyerah disimpan untuk penyaringan spam (FR-PGD-08), BUKAN
-             * untuk mengenali pelapor. Pada pengaduan anonim ia tetap diisi,
-             * dan itu memang dibolehkan chk_complaints_anon: IP sebuah warnet
-             * atau ponsel yang dipakai bergantian bukan identitas, sedangkan
-             * tanpa ia satu skrip dapat membanjiri kotak pengaduan desa tanpa
-             * ada satu pun cara menghentikannya.
+             * SIDIK JARI BER-KUNCI dari alamat IP, BUKAN alamat IP-nya —
+             * penyimpangan dari `submitted_ip VARCHAR(45)` pada docs/05 §3.5,
+             * dicatat bersama KEP-018.
+             *
+             * Yang dibutuhkan FR-PGD-08 hanyalah PERBANDINGAN SAMA-TIDAK-SAMA:
+             * "sudah berapa pengaduan dari jaringan ini dalam 24 jam". Itu
+             * dapat dijawab HMAC tanpa pernah menyimpan alamatnya.
+             *
+             * Mengapa itu penting, dan ini jalan pintas RULE-09 yang paling
+             * mudah terlewat: audit log mencatat `ip_address` setiap kali
+             * seseorang masuk. Alamat IP mentah di tabel pengaduan karena itu
+             * dapat di-JOIN dengan baris login — dan pengaduan anonim tentang
+             * pungutan liar menjadi bernama kembali lewat dua kueri, oleh
+             * orang yang justru paling sering diadukan. CHECK
+             * `chk_complaints_anon` tidak menolongnya sama sekali, karena
+             * kolom ini memang tidak dilarangnya.
+             *
+             * HMAC dan bukan hash biasa, dengan alasan yang sama seperti NIK
+             * (PiiCipher): ruang IPv4 hanya 4 miliar nilai, sehingga tabel
+             * pelangi seluruhnya dapat dibangun dalam hitungan menit. Dengan
+             * pepper rahasia, basis data yang bocor tidak membocorkan satu pun
+             * alamat.
+             *
+             * CHAR(64) karena HMAC-SHA256 heksadesimal; 45 pada docs/05
+             * dirancang untuk alamat IPv6 yang kini tidak lagi disimpan.
              */
-            $t->string('submitted_ip', 45)->nullable();
+            $t->char('submitted_ip_hash', 64)->nullable()
+                ->comment('HMAC-SHA256 alamat IP — perbandingan spam, bukan identitas');
 
             $t->dateTime('created_at')->useCurrent();
             $t->dateTime('updated_at')->useCurrent()->useCurrentOnUpdate();

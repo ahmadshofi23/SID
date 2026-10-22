@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\Citizen\CitizenVerificationController;
 use App\Http\Controllers\Citizen\RegistrationController;
 use App\Http\Controllers\Citizen\WargaController;
+use App\Http\Controllers\Complaint\PublicComplaintController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Letter\LetterAttachmentController;
 use App\Http\Controllers\Letter\LetterController;
@@ -116,6 +117,40 @@ Route::get('surat/lacak', [LetterTrackingController::class, 'show'])
 Route::post('surat/lacak', [LetterTrackingController::class, 'track'])
     ->middleware('throttle:8,1')
     ->name('surat.lacak.cari');
+
+/* --------------------------- Pengaduan (publik) -------------------------
+ | FR-PGD-01, FR-PGD-02, UC-13. TANPA otentikasi: matriks RBAC docs/03 §4.9
+ | memberi PB (publik) "C(anonim)" atas pengaduan, dan hak mengadu tidak boleh
+ | bergantung pada punya tidaknya akun — orang yang paling perlu mengadu
+ | seringkali orang yang paling tidak terdaftar di mana pun.
+ |
+ | Inertia, bukan Blade, dan itu TIDAK melanggar KEP-016: §5-nya menetapkan
+ | batasnya pada formulir dengan keadaan validasi. Alasan lengkapnya ada di
+ | PublicComplaintController.
+ |
+ | LAJU DIBATASI DI DUA TEMPAT, dan keduanya perlu:
+ |   - `throttle:5,60` pada pengiriman — lima pengaduan per jam per IP. Pagar
+ |     kasar yang menahan banjir dari satu skrip, tetapi ia menghitung
+ |     permintaan HTTP dan lupa setiap kali cache dibersihkan.
+ |   - hitungan baris per IP di ComplaintService, yang membaca pengaduan yang
+ |     benar-benar tersimpan dan karena itu tetap berlaku melewati
+ |     penyetelan ulang cache.
+ |
+ | Pelacakan dibatasi lebih ketat daripada pelacakan surat (`throttle:8,1`):
+ | kode pelacakan adalah SATU-SATUNYA faktor pembuka pengaduan, jadi tidak ada
+ | faktor kedua yang memperlambat terkaan.
+ */
+Route::get('pengaduan', [PublicComplaintController::class, 'create'])
+    ->name('pengaduan.buat');
+Route::post('pengaduan', [PublicComplaintController::class, 'store'])
+    ->middleware('throttle:5,60')
+    ->name('pengaduan.kirim');
+
+Route::get('pengaduan/lacak', [PublicComplaintController::class, 'showTracking'])
+    ->name('pengaduan.lacak');
+Route::post('pengaduan/lacak', [PublicComplaintController::class, 'track'])
+    ->middleware('throttle:6,1')
+    ->name('pengaduan.lacak.cari');
 
 /* --------------------------- Tamu (belum masuk) ------------------------- */
 Route::middleware('guest')->group(function (): void {
@@ -380,6 +415,19 @@ Route::middleware('auth')->group(function (): void {
         Route::get('pengajuan', [WargaController::class, 'pengajuan'])->name('warga.pengajuan');
         Route::get('pengajuan/{id}', [WargaController::class, 'pengajuanDetail'])
             ->name('warga.pengajuan.detail');
+
+        /*
+         * "Pengaduan saya" — FR-PGD-02.
+         *
+         * Hanya pengaduan yang ia laporkan SENDIRI, bukan satu KK seperti
+         * daftar pengajuan surat di atasnya. Pengaduan anonim tidak muncul di
+         * sini sama sekali, karena RULE-09 melarang menyimpan tautan ke
+         * akunnya; layarnya WAJIB mengatakan itu agar warga tidak menyangka
+         * laporannya hilang. Jalurnya `pengaduan/lacak` dengan kode.
+         */
+        Route::get('pengaduan', [WargaController::class, 'pengaduan'])->name('warga.pengaduan');
+        Route::get('pengaduan/{id}', [WargaController::class, 'pengaduanDetail'])
+            ->name('warga.pengaduan.detail');
     });
 
     /* ---------------- Verifikasi akun warga (Sprint 6) -----------------

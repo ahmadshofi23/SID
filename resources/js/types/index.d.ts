@@ -337,3 +337,57 @@ export interface LetterRequestDetail extends LetterRequestRow {
     logs: LetterRequestLog[]
     letter: IssuedLetter | null
 }
+
+/* ======================== Pengaduan (Sprint 7) ========================= */
+
+export type ComplaintStatus = 'baru' | 'diterima' | 'diproses' | 'selesai' | 'ditolak'
+
+export interface ComplaintStep {
+    id: string
+    to_label: string | null
+    note: string
+    /** Sudah diformat server pada kalender desa — jangan diformat ulang. */
+    at: string
+}
+
+/**
+ * Pelacakan pengaduan dengan kode — FR-PGD-02.
+ *
+ * Tidak memuat identitas pelapor dan tidak memuat nama petugas: halaman ini
+ * terbuka bagi siapa pun yang memegang kodenya, dan menyebut petugas yang
+ * menangani pengaduan tentang perangkat desa justru dapat membahayakan orang.
+ */
+export interface ComplaintTracking {
+    ticket_number: string
+    status: ComplaintStatus
+    status_label: string
+    category: string
+    title: string
+    is_open: boolean
+    is_overdue: boolean
+    created_at: string | null
+    due_at: string | null
+    resolved_at: string | null
+    resolution: string | null
+    timeline: ComplaintStep[]
+}
+
+/** Pengaduan milik akun warga sendiri — portal warga. */
+export interface ComplaintForCitizen extends ComplaintTracking {
+    id: string
+    location_text: string | null
+}
+
+/**
+ * Tanda terima pengaduan — muncul SATU KALI, tepat setelah dikirim.
+ *
+ * `tracking_code` tidak dapat dibuka kembali: ia tidak pernah ikut ke payload
+ * mana pun selain ini (lihat ComplaintPresenter).
+ */
+export interface ComplaintReceipt {
+    ticket_number: string
+    tracking_code: string
+    is_anonymous: boolean
+    title: string
+    triage_due_at: string | null
+}

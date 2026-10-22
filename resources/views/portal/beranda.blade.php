@@ -18,10 +18,12 @@
               Dua tindakan di atas garis lipat — docs/07 §5.5: warga datang ke
               situs desa untuk MENGURUS sesuatu, bukan membaca berita.
 
-              Rancangan aslinya menaruh "Lapor Pengaduan" sebagai tombol kedua;
-              modul pengaduan baru dibangun Sprint 7. Yang menggantikannya bukan
-              tombol mati, melainkan satu-satunya layanan mandiri yang memang
-              sudah berjalan hari ini: pelacakan status pengajuan (KEP-014).
+              "Lapor Pengaduan" kini menjadi tombol kedua sebagaimana rancangan
+              aslinya, karena modulnya sudah berjalan (Sprint 7, FR-PGD-01).
+              Pelacakan status pengajuan turun menjadi baris tautan di bawah:
+              ia tetap berguna, tetapi melacak adalah tindakan orang yang sudah
+              mengurus sesuatu, sementara dua tombol di atas garis lipat harus
+              menjadi tindakan orang yang BARU DATANG.
             --}}
             <div class="mt-7 flex flex-col gap-3 sm:flex-row">
                 <a href="{{ auth()->check() ? route('warga.ajukan') : route('portal.layanan') }}"
@@ -32,11 +34,18 @@
                         <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
-                <a href="{{ route('surat.lacak') }}"
+                <a href="{{ route('pengaduan.buat') }}"
                    class="touch-target inline-flex items-center justify-center rounded-lg border border-line-strong bg-surface px-6 py-3 font-medium transition-colors hover:bg-surface-hover">
-                    Lacak Status Pengajuan
+                    Lapor Pengaduan
                 </a>
             </div>
+
+            <p class="mt-4 text-sm text-content-secondary">
+                Sudah mengurus sesuatu?
+                <a class="font-medium text-accent hover:underline" href="{{ route('surat.lacak') }}">Lacak status pengajuan surat</a>
+                atau
+                <a class="font-medium text-accent hover:underline" href="{{ route('pengaduan.lacak') }}">lacak pengaduan</a>.
+            </p>
 
             {{--
               Pendaftaran akun diletakkan sebagai baris ketiga, bukan tombol

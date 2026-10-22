@@ -77,7 +77,18 @@ final class ComplaintWorkflowTest extends TestCase
 
         $this->assertSame(Complaint::STATUS_NEW, $pengaduan->status);
         $this->assertMatchesRegularExpression('/^P\d{6}-[A-Z0-9]{5}$/', $pengaduan->ticket_number);
-        $this->assertSame(16, mb_strlen($pengaduan->tracking_code));
+        /*
+         * Abjad kodenya membuang huruf dan angka yang tertukar saat ditulis
+         * tangan (I, L, O, U, 0, 1) — lihat ComplaintService::TRACKING_ALPHABET.
+         * Salah satu karakter berarti pelapor anonim kehilangan pengaduannya
+         * untuk selamanya, jadi ini bukan kenyamanan melainkan syarat agar
+         * janji FR-PGD-02 dapat ditepati.
+         */
+        $this->assertMatchesRegularExpression(
+            '/^[2-9A-HJKMNP-TV-Z]{16}$/',
+            $pengaduan->tracking_code,
+            'Kode pelacakan memuat karakter yang mudah tertukar saat ditulis tangan.'
+        );
         $this->assertSame($this->warga->id, $pengaduan->reporter_user_id);
 
         // Senin 19 Okt + 2 hari kerja = Rabu 21 Okt, akhir hari pada kalender desa.

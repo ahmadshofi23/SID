@@ -11,6 +11,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Repositories\ComplaintRepository;
 use App\Services\Audit\AuditLogger;
+use App\Support\Pii\PiiCipher;
 use App\Support\VillageTime;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,7 @@ final class ComplaintService
         private readonly ComplaintRepository $complaints,
         private readonly ComplaintNotifier $notifier,
         private readonly AuditLogger $audit,
+        private readonly PiiCipher $pii,
     ) {}
 
     /* ============================== Pengajuan ============================= */
@@ -51,7 +53,14 @@ final class ComplaintService
     {
         $anonymous = (bool) ($input['is_anonymous'] ?? false);
 
-        $this->guardNotFlooding($ip);
+        /*
+         * Alamat IP diubah menjadi sidik jari ber-kunci SEKALI, di sini, dan
+         * yang mentahnya tidak pernah menyentuh basis data. Lihat keterangan
+         * panjang pada kolom `submitted_ip_hash` di migrasinya.
+         */
+        $ipHash = $ip === null ? null : $this->pii->hash($ip);
+
+        $this->guardNotFlooding($ipHash);
 
         $now = now();
 
@@ -77,7 +86,7 @@ final class ComplaintService
             'reporter_phone' => $this->nonEmpty($input['reporter_phone'] ?? null),
         ];
 
-        return DB::transaction(function () use ($input, $identity, $ip, $now, $anonymous): Complaint {
+        return DB::transaction(function () use ($input, $identity, $ipHash, $now, $anonymous): Complaint {
             $complaint = $this->complaints->create([
                 ...$identity,
                 'ticket_number' => $this->generateTicket(),
@@ -92,7 +101,7 @@ final class ComplaintService
                 'status' => Complaint::STATUS_NEW,
                 'priority' => Complaint::PRIORITY_NORMAL,
                 'triage_due_at' => $this->triageDueDate($now),
-                'submitted_ip' => $ip,
+                'submitted_ip_hash' => $ipHash,
             ]);
 
             $this->writeAction($complaint, null, Complaint::STATUS_NEW, 'Pengaduan diterima sistem.');
@@ -107,18 +116,39 @@ final class ComplaintService
             $this->notifier->awaitingTriage($complaint);
 
             /*
-             * Audit log TIDAK memuat satu pun kolom isi pengaduan.
+             * AUDIT LOG PENGADUAN ANONIM TIDAK MENYEBUT PENGADUANNYA, dan ini
+             * bukan kehati-hatian berlebihan melainkan menutup jalan pintas
+             * RULE-09 yang paling mudah terlewat.
              *
-             * Nomor tiket saja sudah cukup untuk menelusuri, sementara judul
-             * atau isi yang tersalin ke audit log akan membocorkan pengaduan
-             * anonim kepada siapa pun yang berhak membaca log — yaitu Admin
-             * Desa, yang justru paling sering menjadi pihak yang diadukan.
+             * AuditLogger::log() dengan model menyimpan `entity_id` BESERTA
+             * `actor_id`, `actor_name`, `actor_roles`, dan `ip_address`
+             * pembuatnya. Pada pengaduan anonim yang dikirim warga yang sedang
+             * masuk, satu baris itu berisi tepat tautan yang dilarang ada di
+             * tabel `complaints` — lengkap dengan namanya. CHECK
+             * `chk_complaints_anon` tidak menolong apa pun di sini, karena
+             * yang dijaganya tabel pengaduan, bukan audit log.
+             *
+             * Karena itu pengaduan anonim dicatat TANPA model dan TANPA
+             * pelaku: yang tersisa hanyalah fakta bahwa sebuah pengaduan
+             * anonim masuk, yang cukup untuk memantau volume dan
+             * penyalahgunaan tanpa dapat ditautkan ke siapa pun.
+             *
+             * Dan pada keduanya, audit log TIDAK memuat judul maupun isi
+             * pengaduan. Nomor tiket sudah cukup untuk menelusuri, sementara
+             * judul yang tersalin ke log akan membocorkan isi pengaduan anonim
+             * kepada siapa pun yang berhak membacanya — yaitu Admin Desa,
+             * yang justru paling sering menjadi pihak yang diadukan.
              */
-            $this->audit->log('complaint.created', $complaint, context: [
-                'tiket' => $complaint->ticket_number,
-                'kategori' => $complaint->category_code,
-                'anonim' => $anonymous,
-            ]);
+            if ($anonymous) {
+                $this->audit->logWithoutActor('complaint.created_anonymous', [
+                    'kategori' => $complaint->category_code,
+                ]);
+            } else {
+                $this->audit->log('complaint.created', $complaint, context: [
+                    'tiket' => $complaint->ticket_number,
+                    'kategori' => $complaint->category_code,
+                ]);
+            }
 
             return $complaint;
         });
@@ -461,15 +491,15 @@ final class ComplaintService
      * desa dapat melapor beberapa kali sehari, dan memblokir mereka jauh lebih
      * merugikan daripada menerima beberapa pengaduan berlebih.
      */
-    private function guardNotFlooding(?string $ip): void
+    private function guardNotFlooding(?string $ipHash): void
     {
-        if ($ip === null) {
+        if ($ipHash === null) {
             return;
         }
 
         $max = (int) config('sid.complaints.max_per_ip_per_day', 10);
 
-        if ($this->complaints->countFromIpSince($ip, now()->subDay()) >= $max) {
+        if ($this->complaints->countFromIpSince($ipHash, now()->subDay()) >= $max) {
             throw ValidationException::withMessages([
                 'body' => 'Sudah terlalu banyak pengaduan dikirim dari jaringan ini '
                     .'dalam 24 jam terakhir. Silakan coba lagi besok, atau sampaikan '
@@ -495,6 +525,24 @@ final class ComplaintService
     }
 
     /**
+     * ABJAD KODE PELACAKAN — tanpa huruf dan angka yang tertukar di kertas.
+     *
+     * Dibuang: huruf I, L, O, U dan angka 0, 1. Keempat pasangan I/1, L/1,
+     * O/0, dan U/V adalah kekeliruan yang pasti terjadi, karena kode ini
+     * memang ditulis ulang dengan tangan — warga desa mencatatnya di buku
+     * atau di balik struk, bukan menyimpannya di pengelola kata sandi.
+     *
+     * Ini bukan kenyamanan melainkan syarat agar janji FR-PGD-02 benar-benar
+     * dapat ditepati: salah satu huruf berarti pelapor ANONIM kehilangan
+     * pengaduannya untuk selamanya, dan tidak ada seorang pun — termasuk
+     * petugas desa — yang dapat mengembalikannya kepadanya.
+     *
+     * Sisa 30 karakter × 16 posisi ≈ 78 bit, masih jauh di atas yang
+     * dibutuhkan untuk menahan terkaan.
+     */
+    private const TRACKING_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+    /**
      * Kode pelacakan — RAHASIA yang dipegang pelapor.
      *
      * Enam belas karakter acak, jauh lebih panjang dari nomor tiket, karena
@@ -503,11 +551,21 @@ final class ComplaintService
      * keanoniman itu sendiri — tanggal lahir adalah identitas. Panjang inilah
      * yang menggantikannya, dan karena itu ia tidak boleh pernah muncul di
      * audit log, notifikasi, maupun daftar petugas.
+     *
+     * random_int() dan bukan Str::random(): yang dibutuhkan di sini adalah
+     * abjad tertentu (lihat TRACKING_ALPHABET), dan keduanya sama-sama
+     * bersumber dari pembangkit acak kriptografis.
      */
     private function generateTrackingCode(): string
     {
+        $max = strlen(self::TRACKING_ALPHABET) - 1;
+
         do {
-            $code = Str::upper(Str::random(16));
+            $code = '';
+
+            for ($i = 0; $i < 16; $i++) {
+                $code .= self::TRACKING_ALPHABET[random_int(0, $max)];
+            }
         } while ($this->complaints->trackingCodeExists($code));
 
         return $code;

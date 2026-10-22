@@ -89,10 +89,26 @@
             </section>
         </div>
 
-        {{-- Pengaduan daring dibangun Sprint 7; halaman ini tidak menjanjikannya. --}}
+        {{--
+          Kanal pengaduan daring sudah berjalan sejak Sprint 7 (FR-PGD-01).
+
+          Jalur ke kantor desa dan Kepala Dusun TETAP disebut lebih dulu, bukan
+          digantikan: sebagian warga desa tidak memakai internet sama sekali,
+          dan halaman yang menyiratkan pengaduan harus lewat formulir akan
+          menutup pintu bagi justru mereka yang paling perlu mengadu.
+
+          Pilihan anonimnya ikut disebut di sini, bukan hanya di dalam
+          formulirnya. Orang yang ingin melaporkan pungutan liar tidak akan
+          membuka formulir pengaduan lebih dulu untuk mencari tahu apakah
+          namanya akan tercatat — ia harus tahu sebelum menekan tautannya.
+        --}}
         <x-alert type="info" class="mt-6" title="Menyampaikan keluhan atau laporan">
-            Keluhan dan laporan warga saat ini disampaikan langsung ke kantor desa
-            atau melalui Kepala Dusun setempat. Kanal pengaduan daring sedang disiapkan.
+            Keluhan dan laporan warga dapat disampaikan langsung ke kantor desa pada jam
+            layanan, melalui Kepala Dusun setempat, atau lewat
+            <a class="font-medium text-accent hover:underline" href="{{ route('pengaduan.buat') }}">formulir pengaduan daring</a>
+            — termasuk <strong>tanpa menyebutkan nama</strong>. Pengaduan diperiksa petugas
+            dalam 2 hari kerja, dan tindak lanjutnya dapat dipantau dengan kode pelacakan di
+            <a class="font-medium text-accent hover:underline" href="{{ route('pengaduan.lacak') }}">halaman pelacakan pengaduan</a>.
         </x-alert>
     </div>
 </x-portal.layout>

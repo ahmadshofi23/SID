@@ -294,17 +294,21 @@ final class ComplaintRepository extends GuardedRepository
     }
 
     /**
-     * Jumlah pengaduan dari satu IP dalam jendela waktu — FR-PGD-08.
+     * Jumlah pengaduan dari satu jaringan dalam jendela waktu — FR-PGD-08.
+     *
+     * Yang diterima adalah SIDIK JARI ber-kunci alamat IP, bukan alamatnya:
+     * alamat mentah tidak pernah disimpan maupun dibandingkan di sini. Lihat
+     * keterangan kolom `submitted_ip_hash` pada migrasinya.
      *
      * TANPA LINGKUP dengan sengaja: pembatasan laju harus menghitung SELURUH
-     * pengaduan dari IP itu, termasuk yang tidak terlihat oleh siapa pun yang
-     * sedang memeriksanya. Yang dikembalikan hanya sebuah angka, bukan isi
-     * pengaduan — jadi tidak ada data yang bocor lewat jalur ini.
+     * pengaduan dari jaringan itu, termasuk yang tidak terlihat oleh siapa pun
+     * yang sedang memeriksanya. Yang dikembalikan hanya sebuah angka, bukan
+     * isi pengaduan — jadi tidak ada data yang bocor lewat jalur ini.
      */
-    public function countFromIpSince(string $ip, \DateTimeInterface $since): int
+    public function countFromIpSince(string $ipHash, \DateTimeInterface $since): int
     {
         return Complaint::query()
-            ->where('submitted_ip', $ip)
+            ->where('submitted_ip_hash', $ipHash)
             ->where('created_at', '>=', $since)
             ->count();
     }

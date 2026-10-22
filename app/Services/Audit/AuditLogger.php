@@ -85,6 +85,67 @@ final class AuditLogger
     }
 
     /**
+     * Catat tindakan TANPA pelaku, apa pun yang sedang masuk — RULE-09.
+     *
+     * MENGAPA METODE INI ADA, dan mengapa ia tidak dapat digantikan dengan
+     * memanggil log() dengan `actor: null`: log() melakukan
+     * `$actor ??= auth()->user()`, sehingga null justru berarti "pakai
+     * pengguna yang sedang masuk". Itu perilaku yang benar untuk hampir
+     * seluruh pencatatan — tetapi ada satu hal yang menuntut sebaliknya.
+     *
+     * Pengaduan ANONIM tidak boleh punya satu pun jejak yang menautkannya ke
+     * seseorang (RULE-09). Baris audit biasa menyimpan actor_id, actor_name,
+     * dan actor_roles; pada pengaduan anonim yang dikirim warga yang sedang
+     * masuk, satu baris itu berisi tepat tautan yang dilarang ada di tabel
+     * pengaduan — lengkap dengan namanya. CHECK `chk_complaints_anon` tidak
+     * menjaga audit log.
+     *
+     * Model SENGAJA tidak dapat diserahkan ke metode ini: baris tanpa pelaku
+     * tetapi dengan entity_id masih dapat ditautkan lewat ip_address dan
+     * waktunya. Yang tersisa hanyalah fakta bahwa sesuatu terjadi — cukup
+     * untuk memantau volume dan penyalahgunaan, tidak cukup untuk menunjuk
+     * siapa pun.
+     *
+     * @param  array<array-key, mixed>|null  $context
+     */
+    public function logWithoutActor(string $action, ?array $context = null): AuditLog
+    {
+        $entry = new AuditLog([
+            'actor_id' => null,
+            'actor_name' => 'sistem',
+            'actor_roles' => null,
+            'action' => $action,
+            'entity_type' => null,
+            'entity_id' => null,
+            'changes' => null,
+            'context' => $context === null ? null : $this->redactor->redact($context),
+            /*
+             * ip_address TIDAK diisi, berbeda dari log() yang selalu mengisinya
+             * dari request(). Alamat IP adalah justru jalan tautnya: baris
+             * login warga membawa alamat yang sama, sehingga satu JOIN
+             * mengembalikan nama yang baru saja dihapus di atas.
+             */
+            'ip_address' => null,
+            'user_agent' => null,
+            'correlation_id' => $this->correlationId(),
+            'created_at' => now(),
+        ]);
+
+        return DB::transaction(function () use ($entry): AuditLog {
+            $previous = AuditLog::query()
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first(['id', 'row_hash']);
+
+            $entry->prev_hash = $previous?->row_hash;
+            $entry->row_hash = $entry->computeHash($previous?->row_hash);
+            $entry->save();
+
+            return $entry;
+        });
+    }
+
+    /**
      * Catat perubahan model: hanya field yang BENAR-BENAR berubah,
      * beserta nilai lama dan baru (FR-PDK-07).
      *
