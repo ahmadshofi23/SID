@@ -43,6 +43,18 @@ final class RoleSeeder extends Seeder
                 'jenis_surat.lihat',
             ],
         ],
+        /*
+         * KETIGA KASI MEMEGANG `pengaduan.tugaskan`, bukan hanya Admin Desa.
+         *
+         * Matriks RBAC docs/03 §4.9 memberi Kasi (KK) "R,U,A" atas pengaduan,
+         * dan penugasan adalah salah satu bentuk "U" — mengubah pengaduan.
+         * Dibatasi ke Admin Desa saja, setiap pelimpahan pekerjaan antar bidang
+         * harus menunggu satu akun ber-2FA yang dipegang satu orang, yang justru
+         * menjamin SLA FR-PGD-06 terlampaui. Kepala Dusun TIDAK ikut: matriks
+         * memberinya "R(wilayah)" — ia membaca pengaduan di dusunnya, tidak
+         * menindaklanjutinya, sehingga ia juga tidak dapat menjadi penerima
+         * tugas (lihat ComplaintService::assign()).
+         */
         Role::KASI_PEMERINTAHAN => [
             'name' => 'Kasi Pemerintahan',
             'description' => 'Pelaksana teknis bidang pemerintahan & kependudukan',
@@ -52,7 +64,7 @@ final class RoleSeeder extends Seeder
                 'mutasi.lihat', 'mutasi.tambah', 'mutasi.ubah', 'wilayah.lihat',
                 'statistik.lihat',
                 'surat.lihat', 'surat.ajukan', 'surat.ubah', 'surat.verifikasi',
-                'pengaduan.lihat', 'pengaduan.tindaklanjut',
+                'pengaduan.lihat', 'pengaduan.tindaklanjut', 'pengaduan.tugaskan',
                 'portal.lihat', 'portal.kelola',
             ],
         ],
@@ -63,7 +75,7 @@ final class RoleSeeder extends Seeder
                 'dashboard.lihat', 'laporan.lihat', 'laporan.ekspor',
                 'penduduk.lihat', 'keluarga.lihat', 'wilayah.lihat',
                 'surat.lihat', 'surat.ajukan', 'surat.verifikasi',
-                'pengaduan.lihat', 'pengaduan.tindaklanjut',
+                'pengaduan.lihat', 'pengaduan.tindaklanjut', 'pengaduan.tugaskan',
                 'bantuan.lihat', 'bantuan.kelola', 'bantuan.ekspor',
             ],
         ],
@@ -75,7 +87,7 @@ final class RoleSeeder extends Seeder
                 'penduduk.lihat', 'keluarga.lihat', 'wilayah.lihat',
                 'surat.lihat', 'surat.ajukan', 'surat.ubah', 'surat.verifikasi',
                 'surat.ekspor',
-                'pengaduan.lihat', 'pengaduan.tindaklanjut',
+                'pengaduan.lihat', 'pengaduan.tindaklanjut', 'pengaduan.tugaskan',
                 'portal.lihat', 'portal.kelola',
             ],
         ],
