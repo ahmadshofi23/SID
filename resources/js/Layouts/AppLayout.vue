@@ -5,7 +5,7 @@ import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
     ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
     Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search, Newspaper, Globe, UserCheck,
-    Megaphone,
+    Megaphone, FileText,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
@@ -129,6 +129,13 @@ const groups = computed<NavGroup[]>(() => [
              */
             { label: 'Lihat Portal Publik', route: '/',
               pattern: '/portal-publik', icon: Globe, show: can('portal.lihat') },
+        ],
+    },
+    {
+        label: 'Laporan',
+        items: [
+            { label: 'Laporan & Ekspor', route: '/laporan',
+              pattern: '/laporan', icon: FileText, show: can('laporan.lihat') },
         ],
     },
     {

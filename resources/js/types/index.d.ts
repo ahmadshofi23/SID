@@ -508,3 +508,60 @@ export interface DashboardProps {
         computed_at: string | null
     } | null
 }
+
+/* ======================== Laporan (Sprint 7) =========================== */
+
+export interface ReportCategoryRow {
+    kode: string
+    label: string
+    jumlah: number
+}
+
+export interface ReportRegionRow {
+    region: string
+    total: number
+    laki: number
+    perempuan: number
+}
+
+export interface ReportServiceRow {
+    code: string
+    name: string
+    total: number
+    selesai: number
+    ditolak: number
+    /** Null bila belum ada satu pun surat selesai — bukan nol. */
+    rata_jam: number | null
+    persen_tepat: number | null
+}
+
+export interface ReportProps {
+    penduduk: {
+        total: number
+        per_wilayah: ReportRegionRow[]
+        per_kategori: Record<string, ReportCategoryRow[]>
+    }
+    mutasi: {
+        dari: string
+        sampai: string
+        total: number
+        per_jenis: ReportCategoryRow[]
+    }
+    layanan: {
+        dari: string
+        sampai: string
+        per_jenis: ReportServiceRow[]
+        sla: DashboardSla
+        tren: DashboardTrendMonth[]
+    }
+    pengaduan: {
+        total: number
+        terbuka: number
+        terlambat: number
+        per_status: ReportCategoryRow[]
+    } | null
+    periode: { dari: string; sampai: string }
+    /** Keterangan lingkup data — wajib ditampilkan, lihat ReportController. */
+    lingkup: string
+    izin: { ekspor: boolean; nik_penuh: boolean }
+}

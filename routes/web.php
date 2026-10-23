@@ -31,6 +31,7 @@ use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Portal\PostController;
 use App\Http\Controllers\Portal\PwaController;
 use App\Http\Controllers\Portal\SitemapController;
+use App\Http\Controllers\Report\ReportController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -477,6 +478,47 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:pengaduan.tindaklanjut')->name('pengaduan.terbitkan');
         Route::post('{id}/tugaskan', [ComplaintController::class, 'assign'])
             ->middleware('izin:pengaduan.tugaskan')->name('pengaduan.tugaskan');
+    });
+
+    /* ------------------- Laporan & ekspor (Sprint 7) --------------------
+     | FR-LAP-03 s.d. FR-LAP-07, UC-18.
+     |
+     | DUA tingkat izin, mengikuti matriks RBAC docs/03 §4.9 baris
+     | "Laporan & ekspor" (R,X):
+     |   - `laporan.lihat` membuka halaman dan melihat angkanya.
+     |   - `laporan.ekspor` mengunduhnya. Setiap unduhan tercatat di audit log
+     |     beserta jumlah baris (BR-41, SRS §4.9 butir 3).
+     |
+     | Buku administrasi menuntut `penduduk.ekspor` DI ATAS `laporan.lihat`,
+     | dan itu bukan kelebihan kehati-hatian: yang keluar dari sana bukan
+     | rekap melainkan satu baris per warga beserta nama, tanggal lahir, dan
+     | alamatnya — ekspor data penduduk dalam bentuk lain, jadi izinnya harus
+     | izin yang sama.
+     |
+     | Apa yang MASUK ke dalam laporan tetap dibatasi repository berlingkup:
+     | Kepala Dusun mencetak rekap dusunnya, dan halamannya mengatakan itu.
+     */
+    Route::prefix('laporan')->group(function (): void {
+        Route::get('/', [ReportController::class, 'index'])
+            ->middleware('izin:laporan.lihat')->name('laporan.index');
+
+        Route::middleware('izin:laporan.ekspor')->group(function (): void {
+            Route::get('penduduk.csv', [ReportController::class, 'exportPopulation'])
+                ->name('laporan.penduduk.csv');
+            Route::get('mutasi.csv', [ReportController::class, 'exportMutations'])
+                ->name('laporan.mutasi.csv');
+            Route::get('layanan.csv', [ReportController::class, 'exportServices'])
+                ->name('laporan.layanan.csv');
+            Route::get('pengaduan.csv', [ReportController::class, 'exportComplaints'])
+                ->name('laporan.pengaduan.csv');
+        });
+
+        Route::middleware('izin:penduduk.ekspor')->group(function (): void {
+            Route::get('buku-induk.pdf', [ReportController::class, 'residentRegister'])
+                ->name('laporan.buku-induk');
+            Route::get('buku-mutasi.pdf', [ReportController::class, 'mutationRegister'])
+                ->name('laporan.buku-mutasi');
+        });
     });
 
     /* ---------------- Verifikasi akun warga (Sprint 6) -----------------

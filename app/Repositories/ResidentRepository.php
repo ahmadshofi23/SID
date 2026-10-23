@@ -12,6 +12,7 @@ use App\Support\Pii\PiiCipher;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use InvalidArgumentException;
 
 /**
  * Satu-satunya pintu ke tabel `residents`.
@@ -492,6 +493,115 @@ final class ResidentRepository extends GuardedRepository
         $resident->save();
 
         return $resident;
+    }
+
+    /**
+     * Rekap penduduk per WILAYAH — FR-LAP-03.
+     *
+     * Dikelompokkan pada tingkat DUSUN, bukan RT, dan itu pilihan sadar:
+     * laporan rekap desa dibaca dalam rapat dan dikirim ke kecamatan, dan
+     * tabel 40 baris RT tidak dapat dibaca siapa pun. Rincian per RT tetap
+     * tersedia lewat halaman penduduk yang dapat disaring.
+     *
+     * Baris tanpa wilayah IKUT, dengan label sendiri. Menyembunyikannya akan
+     * membuat jumlah seluruh baris tidak sama dengan total penduduk — dan
+     * laporan yang tidak dapat dijumlahkan sendiri adalah laporan yang tidak
+     * dipercaya, lalu dikerjakan ulang dengan tangan.
+     *
+     * @return list<array{region: string, total: int, laki: int, perempuan: int}>
+     */
+    public function recapByRegion(): array
+    {
+        $rows = $this->scoped()
+            ->where('status', Resident::STATUS_ACTIVE)
+            ->with('region:id,name,path,level')
+            ->get(['id', 'region_id', 'gender']);
+
+        $byDusun = [];
+
+        foreach ($rows as $resident) {
+            /*
+             * Nama dusun diambil dari SEGMEN PERTAMA `path`, bukan dengan
+             * menelusuri relasi parent: menelusuri relasi untuk tiap baris
+             * berarti satu kueri per penduduk, dan pada 20.000 penduduk
+             * laporan ini tidak akan pernah selesai.
+             */
+            $label = $this->dusunLabelOf($resident);
+
+            $byDusun[$label] ??= ['region' => $label, 'total' => 0, 'laki' => 0, 'perempuan' => 0];
+            $byDusun[$label]['total']++;
+            $byDusun[$label][$resident->gender === 'L' ? 'laki' : 'perempuan']++;
+        }
+
+        ksort($byDusun);
+
+        return array_values($byDusun);
+    }
+
+    private function dusunLabelOf(Resident $resident): string
+    {
+        $region = $resident->region;
+
+        if ($region === null) {
+            return 'Tanpa wilayah';
+        }
+
+        if ($region->level === 'dusun') {
+            return $region->name;
+        }
+
+        $rootPath = explode('/', $region->path)[0];
+
+        return self::$dusunNames[$rootPath] ??= (string) (Region::query()
+            ->where('path', $rootPath)
+            ->value('name') ?? 'Tanpa wilayah');
+    }
+
+    /** @var array<string, string> cache nama dusun per permintaan */
+    private static array $dusunNames = [];
+
+    /**
+     * Rekap penduduk per KATEGORI — FR-LAP-03.
+     *
+     * Satu kueri agregat per kategori, bukan memuat seluruh baris: kategori
+     * dihitung di basis data karena yang dibutuhkan hanya cacahnya.
+     *
+     * Jenisnya sengaja `string` dan bukan daftar nilai yang dipersempit:
+     * nilainya datang dari parameter kueri HTTP, dan jenis yang sudah
+     * dipersempit di PHPDoc hanya memindahkan janji itu ke tempat yang tidak
+     * memeriksanya. Yang menyempitkannya adalah daftar putih di bawah.
+     *
+     * @return array<string, int> kode => jumlah
+     */
+    public function recapByCategory(string $column): array
+    {
+        $allowed = [
+            'gender', 'religion_code', 'education_code',
+            'occupation_code', 'marital_status_code',
+        ];
+
+        /*
+         * Nama kolom DIPERIKSA terhadap daftar putih, bukan dipercaya.
+         *
+         * Nilai ini berasal dari parameter kueri HTTP, dan nama kolom tidak
+         * dapat diikat sebagai parameter SQL — ia disisipkan ke dalam teks
+         * kueri. Daftar putih adalah satu-satunya yang memisahkan laporan ini
+         * dari injeksi SQL.
+         */
+        if (! in_array($column, $allowed, true)) {
+            throw new InvalidArgumentException("Kategori rekap tidak dikenali: {$column}");
+        }
+
+        /** @var array<string, int> */
+        return $this->scoped()
+            ->where('status', Resident::STATUS_ACTIVE)
+            ->toBase()
+            ->selectRaw("COALESCE({$column}, '') AS kode, COUNT(*) AS jumlah")
+            ->groupBy('kode')
+            ->orderByDesc('jumlah')
+            ->pluck('jumlah', 'kode')
+            ->map(fn ($v): int => (int) $v)
+            ->all();
     }
 
     /**

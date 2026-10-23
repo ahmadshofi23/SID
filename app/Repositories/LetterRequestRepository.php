@@ -362,6 +362,64 @@ final class LetterRequestRepository extends GuardedRepository
     }
 
     /**
+     * Rekap layanan surat per JENIS — FR-LAP-05.
+     *
+     * Volume, rata-rata waktu penyelesaian, dan ketepatan SLA per jenis surat
+     * dalam satu kueri agregat.
+     *
+     * Rata-rata dihitung HANYA dari yang sudah selesai, dengan alasan yang
+     * sama seperti slaPerformance(): memasukkan yang masih berjalan membuat
+     * angkanya membaik justru ketika antrean menumpuk. Jenis surat yang belum
+     * punya satu pun surat selesai tetap muncul dengan rata-rata null — bukan
+     * nol, yang akan terbaca sebagai "selesai seketika".
+     *
+     * @return list<array{code: string, name: string, total: int, selesai: int, ditolak: int, rata_jam: float|null, persen_tepat: float|null}>
+     */
+    public function serviceRecap(?Carbon $from = null, ?Carbon $to = null): array
+    {
+        /*
+         * Nama kolom DIKUALIFIKASI dengan nama tabelnya, bukan ditulis polos.
+         *
+         * Kueri ini menggabung `letter_types`, dan KEDUA tabel punya
+         * `created_at`. Tanpa kualifikasi MySQL menolaknya sebagai ambigu —
+         * yang di layar petugas berupa HTTP 500 pada halaman laporan.
+         */
+        $rows = $this->scoped()
+            ->when($from !== null, fn (Builder $q) => $q->where('letter_requests.created_at', '>=', $from))
+            ->when($to !== null, fn (Builder $q) => $q->where('letter_requests.created_at', '<=', $to))
+            ->toBase()
+            ->join('letter_types', 'letter_requests.letter_type_id', '=', 'letter_types.id')
+            ->groupBy('letter_types.code', 'letter_types.name', 'letter_types.sort_order')
+            ->orderBy('letter_types.sort_order')
+            ->selectRaw('letter_types.code AS code, letter_types.name AS name')
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw('SUM(CASE WHEN letter_requests.status = ? THEN 1 ELSE 0 END) AS selesai', [LetterRequest::STATUS_ISSUED])
+            ->selectRaw('SUM(CASE WHEN letter_requests.status = ? THEN 1 ELSE 0 END) AS ditolak', [LetterRequest::STATUS_REJECTED])
+            ->selectRaw('AVG(CASE WHEN completed_at IS NOT NULL AND submitted_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, submitted_at, completed_at) END) AS rata_menit')
+            ->selectRaw('SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS berakhir')
+            ->selectRaw('SUM(CASE WHEN completed_at IS NOT NULL AND (due_at IS NULL OR completed_at <= due_at) THEN 1 ELSE 0 END) AS tepat')
+            ->get();
+
+        return $rows->map(function (object $row): array {
+            $berakhir = (int) $row->berakhir;
+
+            return [
+                'code' => (string) $row->code,
+                'name' => (string) $row->name,
+                'total' => (int) $row->total,
+                'selesai' => (int) $row->selesai,
+                'ditolak' => (int) $row->ditolak,
+                'rata_jam' => $row->rata_menit === null
+                    ? null
+                    : round(((float) $row->rata_menit) / 60, 1),
+                'persen_tepat' => $berakhir === 0
+                    ? null
+                    : round((int) $row->tepat / $berakhir * 100, 1),
+            ];
+        })->all();
+    }
+
+    /**
      * Pengajuan terbuka milik pemohon untuk jenis surat yang sama.
      *
      * Dipakai untuk mencegah pengajuan ganda (FR-SRT-04): warga yang menekan
