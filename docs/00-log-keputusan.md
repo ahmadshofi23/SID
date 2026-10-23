@@ -698,3 +698,86 @@ laju sebagai satu-satunya pagar; (b) satu jawaban seragam untuk semua hasil;
    verifikasi dengan **404**. Tanpa pagar itu, rute ini menjadi cara
    mengaktifkan akun apa pun yang kebetulan berstatus menunggu — termasuk
    akun petugas yang sengaja dinonaktifkan.
+
+---
+
+## KEP-018 — Pengaduan: dua kolom tenggat, dan sidik jari IP alih-alih alamatnya
+**Tanggal:** 2026-10-22 · **Status:** Wajib · **Kategori:** model data, privasi
+
+**Masalah yang ditemukan:** skema `complaints` pada docs/05 §3.5 menyediakan
+**satu** kolom tenggat (`due_at`) dan satu kolom alamat IP (`submitted_ip`).
+Keduanya ternyata tidak cukup ketika FR-PGD-06 dan RULE-09 dikerjakan
+bersamaan.
+
+*Tenggat.* FR-PGD-06 menetapkan **dua** batas yang berjalan berurutan: triase
+2 hari dan penyelesaian 14 hari kerja. Satu kolom memang cukup untuk
+menampilkan "terlambat" hari ini — maknanya tinggal berpindah mengikuti status
+— tetapi ia **menimpa** angka tenggat triase begitu pengaduan ditriase.
+Akibatnya pertanyaan "berapa persen pengaduan ditriase tepat waktu" hanya
+dapat dijawab untuk pengaduan yang BELUM ditangani, yaitu justru yang belum
+punya hasil. Ketepatan triase adalah satu-satunya angka yang menunjukkan
+apakah pengaduan warga dibaca orang, dan ia hilang tepat ketika pengaduannya
+selesai.
+
+*Alamat IP.* FR-PGD-08 menuntut pembatasan laju per IP, dan skema menyimpan
+alamatnya mentah. Tetapi audit log mencatat `ip_address` setiap kali seseorang
+masuk. Alamat mentah di tabel pengaduan karena itu dapat **di-JOIN** dengan
+baris login: pengaduan anonim tentang pungutan liar menjadi bernama kembali
+lewat dua kueri, oleh orang yang berhak membaca audit log — yaitu Admin Desa,
+yang justru paling sering menjadi pihak yang diadukan. CHECK
+`chk_complaints_anon` tidak menolong sama sekali, karena kolom itu memang tidak
+dilarangnya.
+
+**Pilihan yang dipertimbangkan:** (a) tetap satu kolom tenggat yang maknanya
+berpindah, dan terima hilangnya angka ketepatan triase; (b) tambah kolom
+`triage_due_at`; (c) tabel riwayat tenggat tersendiri. Untuk IP: (d) simpan
+mentah dan andalkan kebijakan agar tidak di-JOIN; (e) jangan simpan apa pun
+dan andalkan middleware `throttle` saja; (f) simpan sidik jari ber-kunci.
+
+**Keputusan:**
+1. Dipilih **(b)**. Kolom `triage_due_at DATETIME NULL` ditambahkan. Ia diisi
+   **sekali** saat pengaduan masuk dan **tidak pernah diubah lagi**, termasuk
+   setelah ditriase — yang membuatnya berguna justru keabadiannya.
+   `due_at` tetap seperti pada docs/05, diisi saat triase.
+   `Complaint::activeDueAt()` yang memutuskan mana yang sedang ditunggu.
+   **(c) ditolak** karena satu tabel tambahan untuk dua angka per baris adalah
+   harga yang tidak sebanding, dan ia menambah satu gabungan pada setiap
+   tampilan antrean.
+2. **Tenggat penyelesaian dihitung dari saat TRIASE**, bukan dari saat
+   pengaduan masuk. Pengaduan yang didiamkan sepuluh hari lalu baru ditriase
+   tidak lantas tersisa empat hari: itu menghukum petugas yang akhirnya
+   menanganinya dan menyembunyikan keterlambatan yang sebenarnya terjadi di
+   tahap triase. Keterlambatan itu punya catatannya sendiri, dan itulah yang
+   harus dibaca bila angka SLA desa terlihat buruk.
+3. Dipilih **(f)**. `submitted_ip VARCHAR(45)` diganti
+   `submitted_ip_hash CHAR(64)` berisi HMAC-SHA256 ber-pepper (`PiiCipher`).
+   Yang dibutuhkan FR-PGD-08 hanyalah perbandingan sama-tidak-sama, dan itu
+   dapat dijawab tanpa pernah menyimpan alamatnya.
+   **HMAC dan bukan hash biasa**, dengan alasan yang sama seperti NIK: ruang
+   IPv4 hanya 4 miliar nilai, sehingga tabel pelanginya dapat dibangun dalam
+   hitungan menit dan hash biasa tidak melindungi apa pun bila basis data
+   bocor. **(e) ditolak** karena middleware `throttle` menghitung permintaan
+   HTTP dan lupa setiap kali cache dibersihkan; hitungan baris tetap berlaku
+   melewati penyetelan ulang cache.
+4. **Batas SLA-nya sendiri dibaca dari tabel `settings`**
+   (`complaint.triage_sla_days`, `complaint.resolution_sla_days`) dengan
+   bawaan FR-PGD-06, bukan dari `config/sid.php`: ia aturan bisnis yang boleh
+   berbeda per desa. Yang di `config/sid.php` hanya batas teknis per jaringan.
+5. **Keterlambatan SELALU dihitung kueri, tidak pernah disimpan.** Perintah
+   `sid:eskalasi-pengaduan` hanya menaikkan prioritas dan mengirim notifikasi
+   — dua hal yang memang menuntut pemicu. Konsekuensinya disengaja: penjadwal
+   yang mati membuat desa kehilangan PERINGATAN, bukan kehilangan kebenaran,
+   dan tidak ada satu angka pun di layar yang menjadi salah karenanya. Pola
+   yang sama dengan penjadwalan terbit konten portal (Sprint 6).
+
+**Konsekuensi yang diterima:** docs/05 §3.5 tidak lagi menggambarkan tabel
+`complaints` secara persis — dua kolomnya berbeda. Dokumen model data harus
+diperbarui pada penyelarasan berikutnya; sampai itu terjadi, entri ini adalah
+sumber kebenarannya. Satu kolom tambahan juga berarti satu indeks tambahan
+(`idx_complaints_triage_due`), yang dibayar pada setiap penyisipan pengaduan —
+jumlah yang kecil dibanding nilai angka ketepatan triase.
+
+Konsekuensi kedua, lebih halus: `submitted_ip_hash` tidak dapat dibaca
+manusia. Perangkat desa yang ingin tahu "pengaduan ini datang dari mana" tidak
+akan pernah mendapat jawabannya dari basis data, dan memang tidak boleh —
+pertanyaan itu sendiri adalah bentuk pembukaan keanoniman.
