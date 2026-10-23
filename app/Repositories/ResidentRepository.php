@@ -512,25 +512,37 @@ final class ResidentRepository extends GuardedRepository
      */
     public function recapByRegion(): array
     {
+        /*
+         * SATU kueri agregat, bukan memuat barisnya.
+         *
+         * Versi sebelumnya mengambil `id, region_id, gender` untuk SETIAP
+         * penduduk aktif lalu menghitungnya di PHP. Pada 20.000 penduduk itu
+         * terukur 370 ms — 81 ms di antaranya SQL dan ± 290 ms sisanya
+         * membangun 20.000 objek Eloquent yang seluruhnya dibuang setelah
+         * ditambahkan ke tiga penghitung (uji beban Sprint 7, docs/22 §7).
+         * Dikelompokkan basis data, hasilnya ± 24 baris (jumlah wilayah ×
+         * dua jenis kelamin) dan terukur di bawah 10 ms.
+         *
+         * Sebabnya pantas diingat karena ia terulang: yang mahal bukan
+         * kuerinya, melainkan menghidrasi baris yang tidak pernah dibaca
+         * satu kolomnya pun.
+         */
         $rows = $this->scoped()
             ->where('status', Resident::STATUS_ACTIVE)
-            ->with('region:id,name,path,level')
-            ->get(['id', 'region_id', 'gender']);
+            ->toBase()
+            ->selectRaw('region_id, gender, COUNT(*) AS jumlah')
+            ->groupBy('region_id', 'gender')
+            ->get();
 
+        $labels = $this->dusunLabelsByRegionId();
         $byDusun = [];
 
-        foreach ($rows as $resident) {
-            /*
-             * Nama dusun diambil dari SEGMEN PERTAMA `path`, bukan dengan
-             * menelusuri relasi parent: menelusuri relasi untuk tiap baris
-             * berarti satu kueri per penduduk, dan pada 20.000 penduduk
-             * laporan ini tidak akan pernah selesai.
-             */
-            $label = $this->dusunLabelOf($resident);
+        foreach ($rows as $row) {
+            $label = $labels[(string) ($row->region_id ?? '')] ?? 'Tanpa wilayah';
 
             $byDusun[$label] ??= ['region' => $label, 'total' => 0, 'laki' => 0, 'perempuan' => 0];
-            $byDusun[$label]['total']++;
-            $byDusun[$label][$resident->gender === 'L' ? 'laki' : 'perempuan']++;
+            $byDusun[$label]['total'] += (int) $row->jumlah;
+            $byDusun[$label][$row->gender === 'L' ? 'laki' : 'perempuan'] += (int) $row->jumlah;
         }
 
         ksort($byDusun);
@@ -538,70 +550,133 @@ final class ResidentRepository extends GuardedRepository
         return array_values($byDusun);
     }
 
-    private function dusunLabelOf(Resident $resident): string
+    /**
+     * Peta id wilayah -> nama DUSUN induknya.
+     *
+     * Dibangun dari seluruh tabel `regions` dalam satu kueri (puluhan baris,
+     * bukan puluhan ribu). Nama dusun diambil dari SEGMEN PERTAMA `path`,
+     * bukan dengan menelusuri relasi `parent`: menelusuri relasi berarti satu
+     * kueri per wilayah, dan itulah bentuk N+1 yang indeks `path` dibuat
+     * untuk menghindarinya (lihat migrasi regions).
+     *
+     * @return array<string, string>
+     */
+    private function dusunLabelsByRegionId(): array
     {
-        $region = $resident->region;
+        $regions = Region::query()->toBase()->get(['id', 'name', 'path', 'level']);
 
-        if ($region === null) {
-            return 'Tanpa wilayah';
+        $dusunByPath = [];
+
+        foreach ($regions as $region) {
+            if ($region->level === 'dusun') {
+                $dusunByPath[(string) $region->path] = (string) $region->name;
+            }
         }
 
-        if ($region->level === 'dusun') {
-            return $region->name;
+        $labels = [];
+
+        foreach ($regions as $region) {
+            $root = explode('/', (string) $region->path)[0];
+            $labels[(string) $region->id] = $dusunByPath[$root] ?? 'Tanpa wilayah';
         }
 
-        $rootPath = explode('/', $region->path)[0];
-
-        return self::$dusunNames[$rootPath] ??= (string) (Region::query()
-            ->where('path', $rootPath)
-            ->value('name') ?? 'Tanpa wilayah');
+        return $labels;
     }
 
-    /** @var array<string, string> cache nama dusun per permintaan */
-    private static array $dusunNames = [];
+    /** Kategori rekap yang diizinkan — FR-LAP-03. */
+    private const RECAP_COLUMNS = [
+        'gender', 'religion_code', 'education_code',
+        'occupation_code', 'marital_status_code',
+    ];
 
     /**
      * Rekap penduduk per KATEGORI — FR-LAP-03.
-     *
-     * Satu kueri agregat per kategori, bukan memuat seluruh baris: kategori
-     * dihitung di basis data karena yang dibutuhkan hanya cacahnya.
-     *
-     * Jenisnya sengaja `string` dan bukan daftar nilai yang dipersempit:
-     * nilainya datang dari parameter kueri HTTP, dan jenis yang sudah
-     * dipersempit di PHPDoc hanya memindahkan janji itu ke tempat yang tidak
-     * memeriksanya. Yang menyempitkannya adalah daftar putih di bawah.
      *
      * @return array<string, int> kode => jumlah
      */
     public function recapByCategory(string $column): array
     {
-        $allowed = [
-            'gender', 'religion_code', 'education_code',
-            'occupation_code', 'marital_status_code',
-        ];
+        return $this->recapByCategories([$column])[$column];
+    }
 
-        /*
-         * Nama kolom DIPERIKSA terhadap daftar putih, bukan dipercaya.
-         *
-         * Nilai ini berasal dari parameter kueri HTTP, dan nama kolom tidak
-         * dapat diikat sebagai parameter SQL — ia disisipkan ke dalam teks
-         * kueri. Daftar putih adalah satu-satunya yang memisahkan laporan ini
-         * dari injeksi SQL.
-         */
-        if (! in_array($column, $allowed, true)) {
-            throw new InvalidArgumentException("Kategori rekap tidak dikenali: {$column}");
+    /**
+     * Rekap BEBERAPA kategori sekaligus — FR-LAP-03.
+     *
+     * MENGAPA SATU KUERI UNTUK LIMA KATEGORI
+     * --------------------------------------
+     * Halaman Laporan menampilkan lima rekap: jenis kelamin, agama,
+     * pendidikan, pekerjaan, status perkawinan. Masing-masing dulu dihitung
+     * `GROUP BY` sendiri, dan setiap satu di antaranya terukur 70–88 ms pada
+     * 20.000 penduduk — bukan karena pengelompokannya mahal, melainkan karena
+     * setiap kueri harus MEMBACA ULANG seluruh baris penduduk: indeks
+     * `idx_residents_status` hanya memuat (status, deleted_at), sehingga
+     * kolom kategorinya diambil satu per satu dari indeks berkluster. Lima
+     * kali pembacaan yang sama = ± 385 ms (uji beban Sprint 7, docs/22 §7).
+     *
+     * Dikelompokkan sekali menurut KOMBINASI kelima kolom, pembacaannya
+     * tinggal satu dan hasilnya ± 90 ms. Jumlah baris yang kembali adalah
+     * banyaknya kombinasi yang benar-benar ada (ratusan pada data desa, bukan
+     * perkalian seluruh kemungkinan), lalu dijumlahkan per kolom di PHP —
+     * pekerjaan yang di bawah satu milidetik.
+     *
+     * PILIHAN YANG DITOLAK: indeks penutup
+     * `(status, deleted_at, gender, religion_code, …)`. Terukur ia memang
+     * membuat kelima kueri lama menjadi 10–22 ms, tetapi hanya dengan
+     * `FORCE INDEX` — pengoptimasi MySQL tetap memilih indeks yang lebih
+     * sempit, dan `FORCE INDEX` di dalam Eloquent adalah janji yang akan
+     * patah tanpa suara pada versi MySQL berikutnya. Ia juga menambah ± 130
+     * byte per baris yang dibayar setiap kali data penduduk berubah, untuk
+     * halaman yang dibuka beberapa kali sehari.
+     *
+     * @param  list<string>  $columns
+     * @return array<string, array<string, int>> kolom => (kode => jumlah)
+     */
+    public function recapByCategories(array $columns): array
+    {
+        foreach ($columns as $column) {
+            /*
+             * Nama kolom DIPERIKSA terhadap daftar putih, bukan dipercaya.
+             *
+             * Nilai ini berasal dari parameter kueri HTTP, dan nama kolom
+             * tidak dapat diikat sebagai parameter SQL — ia disisipkan ke
+             * dalam teks kueri. Daftar putih adalah satu-satunya yang
+             * memisahkan laporan ini dari injeksi SQL.
+             */
+            if (! in_array($column, self::RECAP_COLUMNS, true)) {
+                throw new InvalidArgumentException("Kategori rekap tidak dikenali: {$column}");
+            }
         }
 
-        /** @var array<string, int> */
-        return $this->scoped()
+        if ($columns === []) {
+            return [];
+        }
+
+        $rows = $this->scoped()
             ->where('status', Resident::STATUS_ACTIVE)
             ->toBase()
-            ->selectRaw("COALESCE({$column}, '') AS kode, COUNT(*) AS jumlah")
-            ->groupBy('kode')
-            ->orderByDesc('jumlah')
-            ->pluck('jumlah', 'kode')
-            ->map(fn ($v): int => (int) $v)
-            ->all();
+            ->select($columns)
+            ->selectRaw('COUNT(*) AS jumlah')
+            ->groupBy($columns)
+            ->get();
+
+        $recap = array_fill_keys($columns, []);
+
+        foreach ($rows as $row) {
+            $jumlah = (int) $row->jumlah;
+
+            foreach ($columns as $column) {
+                // Kode kosong dipertahankan sebagai '' (bukan dibuang): rekap
+                // yang jumlahnya tidak sama dengan totalnya tidak dipercaya.
+                $code = (string) ($row->{$column} ?? '');
+                $recap[$column][$code] = ($recap[$column][$code] ?? 0) + $jumlah;
+            }
+        }
+
+        foreach ($columns as $column) {
+            arsort($recap[$column]);
+        }
+
+        return $recap;
     }
 
     /**

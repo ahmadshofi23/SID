@@ -37,3 +37,9 @@ coverage.xml
 # Berkas impor memuat NIK ribuan warga — jangan pernah di-commit
 /storage/app/private/imports
 /storage/app/imports
+
+# Keluaran uji beban — dibangkitkan ulang setiap kali diukur, dan `data-uji.json`
+# memuat id pengaduan milik satu basis data volume tertentu sehingga tidak
+# berarti apa pun di mesin lain (tests/Load/README.md)
+/tests/Load/data-uji.json
+/tests/Load/hasil-*.json

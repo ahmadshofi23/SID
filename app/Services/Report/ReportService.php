@@ -41,28 +41,33 @@ final class ReportService
     {
         $labels = ReferenceData::labels();
 
+        /*
+         * SATU pemanggilan untuk kelima kategori, bukan lima.
+         *
+         * Lima pemanggilan `recapByCategory()` berarti lima kali membaca
+         * seluruh tabel penduduk — ± 385 ms pada 20.000 penduduk, cukup
+         * sendirian untuk membuat halaman ini melewati NFR-PERF-01
+         * (p95 baca ≤ 500 ms). Lihat ResidentRepository::recapByCategories()
+         * dan docs/22-uji-beban-sprint-7.md §7.
+         */
+        $recap = $this->residents->recapByCategories([
+            'gender', 'religion_code', 'education_code',
+            'occupation_code', 'marital_status_code',
+        ]);
+
         return [
             'total' => $this->residents->countActive(),
             'per_wilayah' => $this->residents->recapByRegion(),
             'per_kategori' => [
                 'jenis_kelamin' => $this->labelled(
-                    $this->residents->recapByCategory('gender'),
+                    $recap['gender'],
                     ['L' => 'Laki-laki', 'P' => 'Perempuan'],
                 ),
-                'agama' => $this->labelled(
-                    $this->residents->recapByCategory('religion_code'),
-                    $labels['religions'],
-                ),
-                'pendidikan' => $this->labelled(
-                    $this->residents->recapByCategory('education_code'),
-                    $labels['educations'],
-                ),
-                'pekerjaan' => $this->labelled(
-                    $this->residents->recapByCategory('occupation_code'),
-                    $labels['occupations'],
-                ),
+                'agama' => $this->labelled($recap['religion_code'], $labels['religions']),
+                'pendidikan' => $this->labelled($recap['education_code'], $labels['educations']),
+                'pekerjaan' => $this->labelled($recap['occupation_code'], $labels['occupations']),
                 'status_perkawinan' => $this->labelled(
-                    $this->residents->recapByCategory('marital_status_code'),
+                    $recap['marital_status_code'],
                     $labels['marital_statuses'],
                 ),
             ],
