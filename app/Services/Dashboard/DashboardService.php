@@ -155,10 +155,20 @@ final class DashboardService
     /**
      * Antrean tugas pengguna aktif — FR-LAP-02.
      *
+     * Barisnya menautkan ke layar petugas, jadi berlaku pagar yang sama
+     * seperti openComplaints(). Warga memang tidak memegang
+     * `surat.verifikasi` maupun `surat.setujui`, tetapi pagar itu dipasang
+     * tegas di sini agar tidak bergantung pada susunan izin yang dapat
+     * berubah di RoleSeeder tanpa ada yang mengingat layar ini.
+     *
      * @return list<array<string, mixed>>|null
      */
     private function awaitingMyAction(AccessScope $scope): ?array
     {
+        if ($scope->isFamilyLimited()) {
+            return null;
+        }
+
         if (! $scope->can('surat.verifikasi') && ! $scope->can('surat.setujui')) {
             return null;
         }
@@ -180,10 +190,24 @@ final class DashboardService
         );
     }
 
-    /** @return list<array<string, mixed>>|null */
+    /**
+     * Daftar pengaduan terbuka — ANTREAN KERJA, bukan ringkasan pribadi.
+     *
+     * Tidak dikirim kepada pengguna berlingkup keluarga (warga) meski ia
+     * memegang `pengaduan.lihat`: setiap barisnya menautkan ke layar PETUGAS,
+     * yang sejak Sprint 7 dijaga middleware `petugas` dan akan menolaknya.
+     * Tautan yang menuntun ke penolakan lebih buruk daripada tautan yang
+     * tidak ada (KEP-012) — dan pengaduannya sendiri memang sudah punya
+     * tempatnya di portal warga.
+     *
+     * Kartu angkanya TETAP ada: "berapa pengaduan saya yang masih terbuka"
+     * adalah keterangan yang sah baginya.
+     *
+     * @return list<array<string, mixed>>|null
+     */
     private function openComplaints(AccessScope $scope): ?array
     {
-        if (! $scope->can('pengaduan.lihat')) {
+        if (! $scope->can('pengaduan.lihat') || $scope->isFamilyLimited()) {
             return null;
         }
 

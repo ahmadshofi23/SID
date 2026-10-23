@@ -75,7 +75,15 @@ final class DashboardTest extends TestCase
                  */
                 ->where('tren', null)
                 ->where('komposisi', null)
-                ->where('perlu_tindakan', null));
+                ->where('perlu_tindakan', null)
+                /*
+                 * Daftar pengaduan terbuka juga null: setiap barisnya
+                 * menautkan ke layar PETUGAS, yang sejak Sprint 7 menolak
+                 * pengguna berlingkup keluarga. Kartu ANGKA-nya tetap ada —
+                 * "berapa pengaduan saya yang masih terbuka" sah baginya.
+                 */
+                ->where('pengaduan_terbuka', null)
+                ->has('pengaduan'));
     }
 
     #[Test]

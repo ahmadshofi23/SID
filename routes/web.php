@@ -303,8 +303,20 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:wilayah.kelola')->name('wilayah.destroy');
     });
 
-    /* -------------------------- Persuratan (Sprint 4) -------------------- */
-    Route::prefix('surat')->group(function (): void {
+    /* -------------------------- Persuratan (Sprint 4) --------------------
+     | Middleware `petugas` dipasang pada SELURUH kelompok ini pada Sprint 7,
+     | sesudah uji penetrasi menemukan kebocoran sejenis di antrean pengaduan.
+     |
+     | Warga memegang `surat.lihat` dan `surat.ajukan` (matriks RBAC docs/03
+     | §4.9 memberinya "C,R*"), sehingga tanpa middleware ini ia dapat membuka
+     | layar PETUGAS untuk pengajuannya sendiri — layar yang memuat catatan
+     | peringatan internal per jenis surat, peran pemeriksa tiap tahap, dan
+     | tombol tindakan yang tidak akan pernah berhasil ia tekan.
+     |
+     | Jalur warga TIDAK berubah: ia tetap mengajukan dan memantau lewat
+     | `/warga/*`, yang dijaga middleware `warga`. Lihat EnsureStaffQueue.
+     */
+    Route::prefix('surat')->middleware('petugas')->group(function (): void {
 
         // Antrean & pemrosesan pengajuan
         Route::get('/', [LetterRequestController::class, 'index'])
@@ -445,6 +457,13 @@ Route::middleware('auth')->group(function (): void {
      | Apa yang DILIHAT masing-masing tetap dibatasi ComplaintRepository, bukan
      | oleh rute: Kepala Dusun yang membuka pengaduan dusun lain mendapat 404,
      | bukan 403 (docs/06 §4).
+     |
+     | Middleware `petugas` DI ATAS izin, dan itu menutup kebocoran nyata yang
+     | ditemukan uji penetrasi Sprint 7: Warga memegang `pengaduan.lihat`
+     | (matriks memberinya "C,R*"), sehingga tanpa middleware ini ia dapat
+     | membuka layar PETUGAS untuk pengaduannya sendiri — lengkap dengan
+     | catatan koordinasi internal yang sengaja disembunyikan darinya di
+     | halaman pelacakan. Alasan lengkapnya ada di EnsureStaffQueue.
      */
     /*
      | DI BAWAH `pengaduan/antrean`, BUKAN `pengaduan` saja — dan ini bukan
@@ -465,7 +484,7 @@ Route::middleware('auth')->group(function (): void {
      | yang di sana sudah ada `/pengaduan/lacak` — tanpa itu, keduanya hanya
      | dipisahkan oleh urutan pendaftaran.
      */
-    Route::prefix('pengaduan/antrean')->group(function (): void {
+    Route::prefix('pengaduan/antrean')->middleware('petugas')->group(function (): void {
         Route::get('/', [ComplaintController::class, 'index'])
             ->middleware('izin:pengaduan.lihat')->name('pengaduan.index');
         Route::get('{id}', [ComplaintController::class, 'show'])

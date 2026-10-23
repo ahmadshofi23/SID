@@ -15,6 +15,18 @@ import NotificationBell from '@/Components/NotificationBell.vue'
 defineProps<{ title?: string }>()
 
 const { user, village, can } = usePageData()
+
+/*
+ * Antrean PETUGAS disembunyikan dari warga.
+ *
+ * Warga memegang `surat.lihat` dan `pengaduan.lihat` (matriks RBAC memberinya
+ * "C,R*"), sehingga `can()` saja tetap menampilkan menu antrean kepadanya —
+ * padahal sejak Sprint 7 rutenya dijaga middleware `petugas` dan akan
+ * menolaknya. Menu yang menuntun ke penolakan lebih buruk daripada menu yang
+ * tidak ada: ia membuat orang menyimpulkan sistemnya rusak (KEP-012).
+ */
+const staf = (permission: string): boolean =>
+    can(permission) && !user.value?.family_limited
 const { theme, toggle: toggleTheme } = useTheme()
 
 const mobileNavOpen = ref(false)
@@ -79,11 +91,11 @@ const groups = computed<NavGroup[]>(() => [
         label: 'Persuratan',
         items: [
             { label: 'Antrean Surat', route: '/surat',
-              pattern: '/surat', icon: Mail, show: can('surat.lihat') },
+              pattern: '/surat', icon: Mail, show: staf('surat.lihat') },
             { label: 'Ajukan Surat', route: '/surat/ajukan',
-              pattern: '/surat/ajukan', icon: FileCheck, show: can('surat.ajukan') },
+              pattern: '/surat/ajukan', icon: FileCheck, show: staf('surat.ajukan') },
             { label: 'Arsip Surat', route: '/surat/arsip',
-              pattern: '/surat/arsip', icon: Archive, show: can('surat.lihat') },
+              pattern: '/surat/arsip', icon: Archive, show: staf('surat.lihat') },
             /*
              * Halaman warga, sengaja ikut di menu petugas.
              *
@@ -98,9 +110,9 @@ const groups = computed<NavGroup[]>(() => [
              * menyediakan tautan kembali ke dasbor bagi yang sudah masuk.
              */
             { label: 'Lacak Pengajuan', route: '/surat/lacak',
-              pattern: '/surat/lacak', icon: Search, show: can('surat.lihat') },
+              pattern: '/surat/lacak', icon: Search, show: staf('surat.lihat') },
             { label: 'Jenis Surat', route: '/jenis-surat',
-              pattern: '/jenis-surat', icon: Settings2, show: can('jenis_surat.lihat') },
+              pattern: '/jenis-surat', icon: Settings2, show: staf('jenis_surat.lihat') },
         ],
     },
     {
@@ -114,7 +126,7 @@ const groups = computed<NavGroup[]>(() => [
         label: 'Pengaduan',
         items: [
             { label: 'Antrean Pengaduan', route: '/pengaduan/antrean',
-              pattern: '/pengaduan/antrean', icon: Megaphone, show: can('pengaduan.lihat') },
+              pattern: '/pengaduan/antrean', icon: Megaphone, show: staf('pengaduan.lihat') },
         ],
     },
     {

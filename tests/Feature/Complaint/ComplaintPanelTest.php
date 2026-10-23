@@ -200,38 +200,29 @@ final class ComplaintPanelTest extends TestCase
     }
 
     #[Test]
-    #[TestDox('Warga yang membuka panel hanya melihat pengaduannya sendiri dan tidak dapat bertindak')]
-    public function warga_di_panel_tetap_terbatas_lingkupnya(): void
+    #[TestDox('Warga ditolak dari panel petugas, termasuk untuk pengaduannya sendiri')]
+    public function warga_ditolak_dari_panel_petugas(): void
     {
-        $wargaLain = $this->userWithRole(Role::WARGA);
         $milikWarga = $this->makeComplaint();
-        $milikOrangLain = $this->service()->create(AccessScope::forUser($wargaLain), [
-            'category_code' => 'lingkungan',
-            'title' => 'Sampah menumpuk di saluran air',
-            'body' => 'Saluran air tersumbat sampah sejak musim hujan mulai.',
-        ]);
 
         /*
-         * Warga MEMANG memegang `pengaduan.lihat` (matriks RBAC docs/03 §4.9
-         * memberinya "C,R*"), sehingga rute panel tidak menolaknya — persis
-         * seperti antrean surat, yang juga terbuka bagi warga karena ia
-         * memegang `surat.lihat`.
+         * Warga MEMANG memegang `pengaduan.lihat` — matriks RBAC docs/03 §4.9
+         * memberinya "C,R*", yaitu membuat dan membaca miliknya sendiri. Izin
+         * itu dilayani portal warga (`/warga/pengaduan`), BUKAN antrean
+         * petugas.
          *
-         * Yang menjaga keamanannya BUKAN rute melainkan lingkup: apa pun yang
-         * ia buka, ComplaintRepository hanya mengembalikan pengaduan yang ia
-         * laporkan sendiri. Itulah yang diuji di sini — bukan kode status
-         * halamannya.
+         * Sebelum middleware `petugas` dipasang, izin itu cukup untuk membuka
+         * layar petugas atas pengaduannya sendiri — lengkap dengan catatan
+         * koordinasi internal yang ditandai tidak terlihat pelapor. Lihat
+         * EnsureStaffQueue dan ComplaintPenetrationTest.
          */
-        $this->actingAs($this->warga)->get('/pengaduan/antrean')
-            ->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page
-                ->has('pengaduan.data', 1)
-                ->where('pengaduan.data.0.ticket_number', $milikWarga->ticket_number));
+        $this->assertTrue($this->warga->hasPermission('pengaduan.lihat'));
 
-        $this->actingAs($this->warga)->get('/pengaduan/antrean/'.$milikOrangLain->id)
-            ->assertNotFound();
+        $this->actingAs($this->warga)->get('/pengaduan/antrean')->assertForbidden();
+        $this->actingAs($this->warga)
+            ->get('/pengaduan/antrean/'.$milikWarga->id)
+            ->assertForbidden();
 
-        // Dan ia tidak dapat bertindak atas pengaduannya sendiri sekalipun.
         $this->actingAs($this->warga)
             ->post('/pengaduan/antrean/'.$milikWarga->id.'/status', [
                 'status' => Complaint::STATUS_ACCEPTED,

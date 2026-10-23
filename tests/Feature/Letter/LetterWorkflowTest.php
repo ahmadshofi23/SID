@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Letter;
 
+use App\Auth\AccessScope;
 use App\Models\Family;
 use App\Models\Letter;
 use App\Models\LetterRequest;
@@ -11,6 +12,7 @@ use App\Models\LetterType;
 use App\Models\Region;
 use App\Models\Resident;
 use App\Models\Role;
+use App\Services\Letter\LetterRequestService;
 use App\Support\NameNormalizer;
 use App\Support\VillageTime;
 use Database\Seeders\LetterTypeSeeder;
@@ -19,6 +21,7 @@ use Inertia\Testing\AssertableInertia;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\TestDox;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -742,20 +745,55 @@ final class LetterWorkflowTest extends TestCase
          */
         $warga = $this->userWithRole(Role::WARGA, residentId: $anggotaKkSendiri->id);
 
+        /*
+         * SEJAK SPRINT 7 antrean `/surat` dijaga middleware `petugas`: warga
+         * mengajukan dan memantau lewat portalnya sendiri (`/warga/*`), dan
+         * layar petugas bukan jalurnya. Lihat EnsureStaffQueue — ia menutup
+         * kebocoran catatan internal yang ditemukan uji penetrasi Sprint 7.
+         */
         $this->actingAs($warga)->post('/surat', [
             'letter_type_id' => $this->sktm->id,
             'resident_id' => $orangLain->id,
             'form' => ['keperluan' => 'Pengajuan beasiswa'],
-        ])->assertNotFound();
+        ])->assertForbidden();
+
+        /*
+         * Pembatasan KELUARGA itu sendiri tetap berlaku dan tidak bergantung
+         * pada rute mana pun: ia ditegakkan ResidentRepository, yang dipakai
+         * LetterRequestService untuk mencari pemohon. Penduduk di luar KK
+         * menjadi 404 — bukan 403 — agar keberadaannya tidak terbocorkan
+         * (docs/06 §4).
+         *
+         * Diuji lewat layanannya langsung, bukan lewat `/warga/ajukan`: jalur
+         * daring menuntut unggahan berkas syarat lebih dulu (SKTM meminta
+         * tiga), sehingga validasi itulah yang akan menjawab — bukan
+         * pembatasan keluarga yang sedang diuji di sini.
+         */
+        $this->actingAs($warga);
+
+        try {
+            app(LetterRequestService::class)->create(
+                AccessScope::forUser($warga),
+                $this->sktm,
+                $orangLain->id,
+                'Pengajuan beasiswa',
+                ['keperluan' => 'Pengajuan beasiswa'],
+            );
+            $this->fail('Warga dapat mengajukan surat untuk orang di luar KK-nya (RULE-11).');
+        } catch (HttpException $e) {
+            $this->assertSame(404, $e->getStatusCode());
+        }
 
         $this->assertDatabaseCount('letter_requests', 0);
 
         // Untuk anggota KK-nya sendiri, pengajuan diterima.
-        $this->actingAs($warga)->post('/surat', [
-            'letter_type_id' => $this->sktm->id,
-            'resident_id' => $anggotaKkSendiri->id,
-            'form' => ['keperluan' => 'Pengajuan beasiswa'],
-        ])->assertRedirect();
+        app(LetterRequestService::class)->create(
+            AccessScope::forUser($warga),
+            $this->sktm,
+            $anggotaKkSendiri->id,
+            'Pengajuan beasiswa',
+            ['keperluan' => 'Pengajuan beasiswa'],
+        );
 
         $this->assertDatabaseCount('letter_requests', 1);
     }

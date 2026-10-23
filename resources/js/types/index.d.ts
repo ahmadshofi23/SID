@@ -14,6 +14,8 @@ export interface AuthUser {
     role_labels: string[]
     permissions: string[]
     region_limited: boolean
+    /** Lingkupnya keluarga sendiri (warga) — antrean petugas disembunyikan. */
+    family_limited: boolean
     region_assigned: boolean
     two_factor_enabled: boolean
 }

@@ -84,6 +84,18 @@ final class HandleInertiaRequests extends Middleware
             'permissions' => $scope->permissions,
             'region_limited' => $scope->isRegionLimited(),
             'region_assigned' => $scope->regionPaths !== [],
+            /*
+             * Lingkupnya sesempit keluarganya sendiri — yaitu warga.
+             *
+             * Dipakai menu untuk menyembunyikan ANTREAN PETUGAS, yang sejak
+             * Sprint 7 dijaga middleware `petugas` (EnsureStaffQueue). Tanpa
+             * ini warga tetap melihat "Antrean Surat" dan "Antrean Pengaduan"
+             * di menunya — ia memang memegang `surat.lihat` dan
+             * `pengaduan.lihat` — lalu menerima 403 ketika menekannya. Menu
+             * yang menuntun ke penolakan lebih buruk daripada menu yang tidak
+             * ada: ia membuat orang menyimpulkan sistemnya rusak (KEP-012).
+             */
+            'family_limited' => $scope->isFamilyLimited(),
             'two_factor_enabled' => $user->hasTwoFactorEnabled(),
         ];
     }
