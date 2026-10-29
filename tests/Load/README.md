@@ -70,7 +70,7 @@ DB_DATABASE=sid_desa_volume php artisan sid:verify-audit-chain
 ## 3. Jalankan server uji
 
 ```bash
-PHP_CLI_SERVER_WORKERS=8 \
+PHP_CLI_SERVER_WORKERS=32 \
 DB_DATABASE=sid_desa_volume \
 APP_DEBUG=false \
 CACHE_STORE=array \
@@ -85,11 +85,24 @@ tanpa itu setiap halaman Inertia menjawab 500.
 Setiap variabel di atas mengubah apa yang terukur, jadi tidak ada yang boleh
 dihapus tanpa sadar:
 
-- **`PHP_CLI_SERVER_WORKERS=8`** — tanpa ini server bawaan PHP melayani
+- **`PHP_CLI_SERVER_WORKERS=32`** — tanpa ini server bawaan PHP melayani
   permintaan satu demi satu, dan uji "50 pengguna bersamaan" hanya mengukur
-  panjang antrean. Delapan ≈ jumlah inti CPU mesin uji.
+  panjang antrean.
+
+  **Jangan menyetelnya sejumlah inti CPU.** Itu dicoba lebih dulu (8 pekerja
+  pada 8 inti) dan hasilnya terukur buruk: server jenuh pada 7,8
+  permintaan/detik, antreannya tumbuh tanpa batas selama tiga puluh menit, dan
+  satu permintaan menunggu 903 detik. Dengan 32 pekerja, aplikasi yang sama
+  persis melayani 87,4 permintaan/detik dengan permintaan terlama 1,9 detik.
+  Sebabnya: setiap permintaan pada server bawaan PHP membangun ULANG seluruh
+  keadaan aplikasi, sehingga ± 1 detik waktu pekerja dihabiskan untuk kerja
+  yang sebenarnya di bawah 100 ms. Pekerja yang lebih banyak menutupi sebagian
+  biaya itu; php-fpm menghapusnya. Lihat docs/22 §6.1.
 - **`CACHE_STORE=array`** — **mematikan pembatas laju per IP**, dan ini
-  disengaja. `throttle:20,1` pada login dan `throttle:5,60` pada pengiriman
+  disengaja. (Ia juga, berlawanan dengan dugaan, lebih CEPAT daripada
+  `redis` di server uji ini: predis membuka sambungan baru pada setiap
+  permintaan, sementara php-fpm menyimpannya lintas permintaan. Terukur 87,4
+  vs 38,2 permintaan/detik — docs/22 §6.2.) `throttle:20,1` pada login dan `throttle:5,60` pada pengiriman
   pengaduan dihitung **per alamat IP**. k6 menekan dari satu host, sehingga 50
   pengguna tiruan tampak sebagai satu alamat IP dan ditolak 429 — bukan karena
   aplikasinya lambat, melainkan karena pembatasnya bekerja dengan benar.

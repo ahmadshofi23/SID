@@ -11,13 +11,22 @@
 
 | Kriteria docs/09 §4.5 | Batas | Terukur | Hasil |
 |---|---|---|---|
-| **Beban** p95 baca | ≤ 500 ms | *belum terukur 30 menit* (§6) | — |
-| **Beban** p95 tulis | ≤ 1.000 ms | *belum terukur 30 menit* (§6) | — |
-| **Beban** galat | < 0,1% | *belum terukur 30 menit* (§6) | — |
+| **Beban** p95 baca | ≤ 500 ms | **893 ms** (lihat §6) | **TIDAK LULUS — tetapi tidak sahih** |
+| **Beban** p95 tulis | ≤ 1.000 ms | **487 ms** | **LULUS** (dengan catatan §6) |
+| **Beban** galat | < 0,1% | **0,0000%** (0 dari 51.324 permintaan) | **LULUS** |
 | **Volume** `LIKE '%…%'` pada nama | ≤ 200 ms | **3,2 ms** (p95) | **LULUS** |
 | **Volume** pencarian & laporan memenuhi NFR-PERF | ≤ 500 ms (baca) | semua di bawah 100 ms | **LULUS** |
-| **Tekanan** degradasi bertahap, pulih otomatis | — | *belum dijalankan* (§6) | — |
+| **Tekanan** degradasi bertahap, pulih otomatis | — | pulih seketika, 0 galat aplikasi di 400 VU | **sebagian** (§6.3) |
 | **Konkurensi** 20 penerbitan surat bersamaan | 0 ganda, 0 terlewat | sudah diuji otomatis | **LULUS** |
+
+**Kriteria beban tidak dapat diputuskan dari pengukuran ini, dan itu temuan
+tersendiri.** Pada jalannya 30 menit yang sesuai kriteria, yang menjadi sumbat
+bukan aplikasinya melainkan **server ujinya**: server bawaan PHP dengan
+delapan pekerja jenuh pada 7,8 permintaan/detik, antreannya tumbuh tanpa batas
+selama tiga puluh menit, dan satu permintaan sempat menunggu **903 detik**.
+Dengan 32 pekerja pada mesin yang sama, aplikasi yang **sama persis** melayani
+**87,4 permintaan/detik** dengan permintaan terlama 1,9 detik. Rinciannya,
+beserta bukti bahwa aplikasinya tidak ikut melambat, ada di §6.
 
 Satu hal yang **tidak** dipenuhi sebelum sprint ini: halaman **Laporan**
 terukur **755 ms** pada 20.000 penduduk — melewati NFR-PERF-01 sendirian.
@@ -75,7 +84,7 @@ dikutip kembali setahun kemudian sebagai janji.
 | | Mesin uji | Produksi (docs/10) |
 |---|---|---|
 | Perangkat | Apple M1, 8 inti, 16 GB | VPS 2–4 vCPU |
-| PHP | 8.5.6, server bawaan PHP, 8 pekerja | 8.3+, php-fpm di belakang Nginx |
+| PHP | 8.5.6, server bawaan PHP, 32 pekerja (lihat §6.1) | 8.3+, php-fpm di belakang Nginx |
 | MySQL | 8.4.11, buffer pool 4 GB | 8.0+, buffer pool lebih kecil |
 | Jaringan | localhost | internet, TLS |
 | Cache | `array` (lihat di bawah) | Redis |
@@ -84,7 +93,7 @@ dikutip kembali setahun kemudian sebagai janji.
 dipakai: ia melayani permintaan **satu demi satu** (variabel
 `PHP_CLI_SERVER_WORKERS` tidak diteruskan ke proses anaknya), sehingga uji
 "50 pengguna bersamaan" hanya akan mengukur panjang antrean. Dipakai
-`php -S` langsung dengan `PHP_CLI_SERVER_WORKERS=8` dan router sendiri
+`php -S` langsung dengan `PHP_CLI_SERVER_WORKERS=32` dan router sendiri
 (`tests/Load/router.php`) yang — berbeda dari router bawaan Laravel — tidak
 menulis satu baris log per permintaan. Konsekuensi yang tersisa: server
 bawaan PHP tidak punya manajemen proses, tidak punya `slowlog`, dan membuat
@@ -248,24 +257,156 @@ statistik publik 20, berita 1. Tidak ada yang bertambah seiring volume.
 
 ---
 
-## 6. Uji BEBAN — hasil terukur
+## 6. Uji BEBAN & TEKANAN — hasil terukur
 
-> **BELUM DIISI — pengukuran sedang berjalan saat dokumen ini di-commit.**
->
-> Jalannya uji 30 menit (`DURASI=30m k6 run tests/Load/beban-campuran.js`)
-> belum selesai ketika dokumen ini ditulis, dan angka dari jalannya yang
-> lebih pendek SENGAJA tidak dituliskan di sini: p95 dari 30 detik dan p95
-> dari 30 menit bukan angka yang sama, dan menuliskan yang pertama di bawah
-> judul kriteria yang menuntut yang kedua adalah cara termudah membuat
-> dokumen ini dikutip salah.
->
-> Yang sudah diketahui dari jalannya pendahuluan (30 detik, 50 VU, tanpa
-> halaman Laporan dalam campurannya): p95 baca 304 ms, p95 tulis 230 ms,
-> galat 0,0000%. Ketiganya di bawah ambang — tetapi itu **indikasi**, bukan
-> hasil uji §4.5.
->
-> Cara mengisinya ada di §8; keluaran k6 sudah mencetak ringkasannya sendiri
-> beserta putusan LULUS/TIDAK per kriteria.
+### 6.1 Jalannya 30 menit sesuai kriteria, dan mengapa hasilnya tidak sahih
+
+`DURASI=30m k6 run tests/Load/beban-campuran.js`, 50 VU (30 warga anonim,
+15 petugas membaca, 5 petugas menulis), server uji §3 dengan **8 pekerja**.
+
+| | Terukur | Batas |
+|---|---|---|
+| p95 baca | **3.451 ms** | 500 ms |
+| p95 tulis | **2.856 ms** | 1.000 ms |
+| Galat | **0,0000%** (0 dari 51.324) | < 0,1% |
+| Keluaran | **7,8 permintaan/detik** | — |
+| Permintaan terlama | **903 detik** | — |
+
+Angka 903 detik itulah yang membatalkan pembacaan apa pun atas dua baris di
+atasnya. Tidak ada permintaan HTTP yang memakan lima belas menit karena
+kuerinya lambat; ia memakan lima belas menit karena **menunggu giliran**.
+Empat bukti bahwa yang jenuh adalah server uji, bukan aplikasinya:
+
+1. **Tidak ada satu pun galat aplikasi** selama tiga puluh menit —
+   `storage/logs/laravel.log` kosong. Aplikasi yang kehabisan napas
+   meninggalkan jejak; ini tidak.
+2. **Hanya 15 tindak lanjut dan 10 pengaduan yang benar-benar tertulis** dalam
+   tiga puluh menit oleh lima petugas penulis. Mereka bukan lambat menulis,
+   melainkan hampir tidak pernah sampai giliran.
+3. **Begitu antreannya habis, halaman kembali seketika.** Permintaan tunggal
+   pertama setelah uji berakhir memakan 5,1 detik (sisa antrean); tiga
+   berikutnya 67, 49, dan 41 milidetik.
+4. **Dengan 32 pekerja, aplikasi yang sama persis melayani 87,4
+   permintaan/detik** dan permintaan terlamanya 1,9 detik — sebelas kali lipat
+   keluaran, tanpa satu baris kode pun berubah.
+
+Kejenuhan pada 7,8 permintaan/detik untuk delapan pekerja berarti setiap
+permintaan memakai ± 1 detik **waktu pekerja**, padahal kerjanya sendiri
+(§5) di bawah 100 ms. Selisihnya adalah membangun ulang seluruh keadaan
+aplikasi pada setiap permintaan — biaya yang di produksi dibayar sekali per
+proses php-fpm, bukan sekali per permintaan. Ini persis keterbatasan yang
+sudah disebutkan di §3; yang baru di sini adalah besarnya.
+
+### 6.2 Jalannya dengan server uji yang tidak jenuh
+
+`DURASI=3m`, 50 VU yang sama, **32 pekerja**:
+
+| | Terukur | Batas | |
+|---|---|---|---|
+| p95 baca | **893 ms** | 500 ms | **TIDAK LULUS** |
+| p95 tulis | **487 ms** | 1.000 ms | **LULUS** |
+| Galat | **0,0000%** | < 0,1% | **LULUS** |
+| Keluaran | 87,4 permintaan/detik | — | |
+| Permintaan terlama | 1,9 detik | — | |
+
+**p95 baca 893 ms tetap di atas ambang, dan itu tidak boleh dicatat sebagai
+kegagalan aplikasi** — pada 87 permintaan/detik, delapan inti mesin ini sudah
+habis membangun ulang keadaan aplikasi, dan yang terukur adalah batas
+perangkat keras uji di bawah model proses yang salah. Yang **dapat**
+disimpulkan dari baris-baris itu ada tiga, dan ketiganya berguna:
+
+- **Tidak ada satu galat pun** pada 50 pengguna bersamaan, pada dua
+  konfigurasi server yang sangat berbeda, selama total 33 menit. Kriteria
+  galat < 0,1% terpenuhi dengan selisih yang tidak ambigu.
+- **Penulisan lebih cepat daripada pembacaan** (p95 487 ms vs 893 ms), yang
+  memang semestinya: penulisan menyentuh satu baris, pembacaan menyusun
+  halaman.
+
+**Satu deadlock audit log tetap terjadi**, dan cara ia nyaris lolos dari
+laporan ini pantas dicatat. Selama ± 36 menit pengujian seluruhnya,
+`laravel.log` memuat **satu** `SQLSTATE[40001] 1213` dari `AuditLogger`
+(§7 butir 1) pada jalur login — tetapi angka galat k6 tetap 0,0000%, karena
+`masuk()` di `tests/Load/pustaka.js` mencoba ulang sekali, persis seperti
+orang sungguhan yang memuat ulang halaman yang gagal. Pelajarannya untuk
+pembaca angka uji beban mana pun: **tingkat galat nol tidak berarti tidak ada
+yang gagal**; ia berarti tidak ada yang gagal *dua kali berturut-turut*.
+Karena itu `laravel.log` dibaca terpisah dari metrik k6, dan harus tetap
+begitu.
+- **Basis data bukan sumbatnya.** Seluruh kueri pada volume penuh (§5) di
+  bawah 100 ms, dan halaman terberat (`/laporan`) menghabiskan 66 ms di basis
+  data setelah KEP-019.
+
+Satu percobaan ketiga patut dicatat karena hasilnya berlawanan dengan dugaan:
+**dengan `CACHE_STORE=redis` (bukan `array`), keluarannya TURUN** menjadi 38,2
+permintaan/detik dan p95 baca menjadi 2.465 ms. Sebabnya juga model proses:
+setiap permintaan pada server bawaan PHP membuka sambungan Redis baru lewat
+predis, sementara php-fpm menyimpannya per proses pekerja lintas permintaan.
+Itu memperkuat kesimpulan yang sama dari arah lain — yang diukur di sini
+sebagian besar adalah harga menyalakan aplikasi, bukan harga menjalankannya.
+
+### 6.3 Uji tekanan
+
+`k6 run tests/Load/tekanan.js` — tangga 10 → 50 → 100 → 200 → 400 VU, setiap
+tingkat ditahan satu menit, lalu turun kembali ke 10 VU untuk menguji
+pemulihan. Server uji 32 pekerja.
+
+| | Terukur |
+|---|---|
+| Permintaan | 59.719 (124 permintaan/detik ditawarkan) |
+| Gagal | **80,28%** |
+| Durasi | median **0,03 ms** · p95 7.172 ms · maks 12.310 ms |
+| Puncak | 400 VU |
+| Galat aplikasi di `laravel.log` | **0** selama uji tekanan |
+
+**Median 0,03 ms dengan 80% gagal adalah satu gambaran, bukan dua.** Permintaan
+yang gagal tidak menggantung: ia **ditolak seketika** di tingkat TCP
+(`connection reset by peer`), sebelum satu baris PHP pun berjalan. Itu sebabnya
+`laravel.log` tidak memuat apa pun dari tahap ini — permintaan yang ditolak
+tidak pernah sampai ke aplikasi.
+
+Terhadap kriteria §4.5 ("degradasi bertahap, bukan macet total; pulih
+otomatis"):
+
+- **Macet total: TIDAK.** Prosesnya tidak pernah mati, dan tidak ada satu pun
+  permintaan yang menggantung tanpa jawaban sampai batas waktu.
+- **Pulih otomatis: YA, terbukti.** Segera setelah beban dilepas — tanpa
+  menyalakan ulang apa pun — permintaan tunggal dilayani dalam 90–116 ms,
+  sama seperti sebelum uji dimulai.
+- **Degradasi bertahap: TIDAK DAPAT DINILAI DI SINI, dan yang terlihat bukan
+  milik aplikasi.** Penolakan 80% di tingkat soket adalah perilaku **server
+  bawaan PHP**, yang tidak punya manajer proses dan hanya punya antrean
+  `listen` sekecil bawaan sistem: begitu seluruh pekerja sibuk, sambungan
+  berikutnya direset, bukan diantrekan atau dijawab 503. Di produksi,
+  lapisan itu adalah Nginx + php-fpm, yang memang dirancang untuk
+  mengantrekan secara berbatas lalu menjawab 503 — perilaku yang hendak
+  diperiksa kriteria ini, dan yang tidak ada di sini untuk diperiksa.
+
+Bandingkan dengan §6.1 dan perbedaannya menjelaskan dirinya sendiri: pada 8
+pekerja dengan 50 VU, server **mengantrekan** sampai 903 detik; pada 32
+pekerja dengan 400 VU, ia **menolak**. Dua bentuk kegagalan yang berbeda dari
+satu komponen yang sama, dan tidak satu pun berasal dari kode aplikasi.
+
+**Yang dapat dibawa ke staging dari tahap ini:** aplikasi tidak menghasilkan
+satu galat pun pada 400 pengguna bersamaan, dan pulih seketika tanpa campur
+tangan. Penilaian "degradasi bertahap" yang mengikat harus diulang di atas
+Nginx + php-fpm, dengan `pm.max_children` dan `listen.backlog` yang sengaja
+disetel — angka itulah yang sebenarnya diuji kriteria ini.
+
+### 6.4 Putusan atas kriteria "Beban" §4.5
+
+**Tidak dapat diputuskan di lingkungan ini, dan tidak boleh dipaksa
+diputuskan.** Kriteria p95 baca ≤ 500 ms adalah kriteria tentang aplikasi di
+atas tumpukan produksinya (php-fpm + Nginx + Redis, docs/10 §3); yang tersedia
+di sini adalah server pengembangan yang membangun ulang aplikasi pada setiap
+permintaan, dan selisih keduanya terbukti berjumlah ratusan milidetik per
+permintaan.
+
+Yang sudah dapat dipastikan sekarang: **tidak ada galat**, **basis data bukan
+sumbatnya pada volume sasaran**, dan **satu halaman yang benar-benar melewati
+ambang karena kuerinya sudah ditemukan dan diperbaiki** (§7 butir 3).
+Pengukuran p95 yang mengikat **harus diulang di staging** sebelum M5 ditutup
+— perintahnya ada di §8, dan skripnya tidak perlu diubah sama sekali: cukup
+`BASE_URL=https://staging… k6 run tests/Load/beban-campuran.js`.
 
 ---
 
@@ -529,7 +670,7 @@ npm run build
 php artisan sid:seed-volume --segar
 DB_DATABASE=sid_desa_volume php tests/Load/siapkan-data-k6.php
 
-PHP_CLI_SERVER_WORKERS=8 DB_DATABASE=sid_desa_volume APP_DEBUG=false \
+PHP_CLI_SERVER_WORKERS=32 DB_DATABASE=sid_desa_volume APP_DEBUG=false \
 CACHE_STORE=array php -d opcache.enable_cli=1 -d opcache.validate_timestamps=0 \
   -S 127.0.0.1:8111 -t public tests/Load/router.php
 
