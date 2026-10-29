@@ -33,9 +33,17 @@ terukur **755 ms** pada 20.000 penduduk — melewati NFR-PERF-01 sendirian.
 Itu diperbaiki dalam sprint ini (**KEP-019**) dan kini 43 ms; rinciannya di
 §7 butir 3.
 
-Dua temuan **tidak** diperbaiki di sini, dengan alasan tertulis di §7 butir 1
-dan 2: deadlock MySQL pada penulisan audit log yang bersamaan, dan kolom
-`changes` yang ternyata tidak pernah masuk ke rantai hash audit.
+Tiga temuan **tidak** diperbaiki di sini, dengan alasan tertulis di §7 butir
+1, 2, dan 5: deadlock MySQL pada penulisan audit log yang bersamaan, kolom
+`changes` yang ternyata tidak pernah masuk ke rantai hash audit, dan
+`sid:verify-audit-chain` yang tumbuh kuadratik. Ketiganya **sudah ditutup
+sesudahnya** oleh **KEP-020**, bersama satu cacat **keempat** yang tidak
+terlihat dari pengukuran ini: rumus lama juga melaporkan rantai RUSAK atas
+baris yang jujur, karena MySQL menata ulang kunci objek JSON saat
+menyimpannya. Cacat keempat dan temuan 2 saling menutupi di sini — penyemai
+volume menyesuaikan diri dengan yang satu dan menulis konteks berkunci
+tunggal, sehingga yang lain tidak pernah muncul. Keterangan per butir ada di
+§7.
 
 ---
 
@@ -412,7 +420,7 @@ Pengukuran p95 yang mengikat **harus diulang di staging** sebelum M5 ditutup
 
 ## 7. Temuan & rekomendasi
 
-### Temuan 1 — `AuditLogger` membuat deadlock MySQL pada penulisan bersamaan *(TIDAK diperbaiki di sini)*
+### Temuan 1 — `AuditLogger` membuat deadlock MySQL pada penulisan bersamaan *(DIPERBAIKI sesudahnya — KEP-020)*
 
 **Apa yang terjadi.** Lima belas pengguna tiruan memanggil `POST /masuk` dalam
 rentang beberapa milidetik yang sama. Sebagian di antaranya dijawab **HTTP
@@ -469,9 +477,22 @@ satu bug yang tidak.
 (`tests/Load/pustaka.js`), dan itu diberi keterangan terbuka bahwa ia menutup
 kerumunan buatan pada detik nol, **bukan** menutup temuan ini.
 
+**Cara ini ditutup (KEP-020).** Tidak dengan salah satu dari ketiga arah di
+atas, dan alasannya ada pada mekanismenya: gap lock InnoDB **saling
+kompatibel**, sehingga dua penyisipan audit saja sudah cukup membentuk
+deadlock lewat insert-intention lock — tanpa sumber daya ketiga. Yang dipasang
+adalah satu **baris mutex** (tabel `audit_chain_lock`, satu baris, dikunci
+dengan kesetaraan kunci primer sehingga tidak mengambil gap lock) yang dikunci
+**sebelum** ujung rantai dibaca. Itu menghapus sebabnya, bukan gejalanya:
+terukur 5 dari 6 gagal tanpanya, 6 dari 6 berhasil dengannya. Arah 1 ditolak
+karena ia mengobati gejala di 32 pemanggilan transaksi pada 13 layanan dan
+penulis layanan berikutnya tidak akan tahu harus menambahkannya; arah 3
+ditolak karena ia memindahkan jaminan keutuhan dari "saat ditulis" ke
+"beberapa saat kemudian". Dijaga `tests/Feature/Audit/AuditChainConcurrencyTest`.
+
 ---
 
-### Temuan 2 — kolom `changes` tidak pernah masuk ke rantai hash audit *(TIDAK diperbaiki di sini)*
+### Temuan 2 — kolom `changes` tidak pernah masuk ke rantai hash audit *(DIPERBAIKI sesudahnya — KEP-020)*
 
 **Apa yang terjadi.** Penyemai volume menghitung rantai hash-nya sendiri, dan
 `sid:verify-audit-chain` menyatakan rantainya rusak pada baris pertama hasil
@@ -517,6 +538,34 @@ perilaku yang seharusnya, karena verifikasinya memakai `computeHash()` yang
 sama. Begitu temuan ini diperbaiki, `VolumeSeeder::chainHash()` wajib diubah
 bersamanya — dan `VolumeSeederTest::rantai_hash_audit_log_tetap_utuh...` akan
 gagal bila lupa.
+
+**Cara ini ditutup (KEP-020), dan cacat KEEMPAT yang ditemukan saat
+menutupnya.** Rumus hash kini satu-satunya, `AuditLog::hashFromRow()`, yang
+membaca kolomnya lewat `getAttributes()` sehingga `changes` benar-benar ikut
+dihitung; `VolumeSeeder::chainHash()` **dihapus** dan penyemai memanggil rumus
+yang sama — salinan rumus itulah yang semula membuat keduanya menyimpang tanpa
+ada yang menyadarinya. Kolom baru `hash_version` memisahkan baris lama dari
+baris baru, karena memperbaiki rumus membatalkan `row_hash` seluruh baris yang
+sudah ada dan baris audit log **tidak boleh** dihitung ulang.
+
+Saat itulah cacat keempat muncul, dan arahnya **berlawanan** dengan temuan ini:
+kolom `context` tidak terbayang oleh properti `$changes`, jadi ia memang sudah
+ikut dihitung — tetapi MySQL menyimpan kolom JSON dalam bentuk binernya
+sendiri dan mengembalikan kuncinya **terurut** (panjang kunci, lalu bytewise)
+pada setiap tingkat sarang, sementara rumus lama meng-encode menurut urutan
+tulis. Akibatnya `sid:verify-audit-chain` melaporkan "RANTAI RUSAK" atas baris
+yang tidak pernah disentuh siapa pun: pada basis data pengembangan, baris
+`letter.issued` id=7 — hash tersimpannya cocok persis bila kuncinya disusun
+`nomor_surat, jenis_surat, tiket`, yaitu urutan tulisnya. Temuan ini adalah
+alarm yang diam; yang itu adalah alarm yang berbunyi atas data jujur, dan
+alarm integritas bukti yang berbunyi palsu akan diabaikan. Keduanya **harus**
+ditutup bersama: memperbaiki yang ini sendirian akan memutus rantai pada
+hampir setiap baris berkunci banyak. Rumus baru karena itu juga
+**mengurutkan** kunci objek sebelum meng-encode (senarai tetap pada
+urutannya, karena di sana urutan bermakna dan MySQL mempertahankannya).
+Keduanya dijaga uji sendiri: `AuditLogTest::perubahan_kolom_changes_terdeteksi`
+(yang sebelum ini **lulus padahal seharusnya gagal**) dan
+`AuditLogTest::urutan_kunci_json_tidak_merusak_rantai`.
 
 ---
 
@@ -592,7 +641,7 @@ di-cache harian, bukan dihitung ulang per pembukaan.
 
 ---
 
-### Temuan 5 — `sid:verify-audit-chain` tumbuh KUADRATIK, karena `lazy()` memakai OFFSET
+### Temuan 5 — `sid:verify-audit-chain` tumbuh KUADRATIK, karena `lazy()` memakai OFFSET *(DIPERBAIKI sesudahnya — KEP-020)*
 
 **Apa yang terjadi.** Verifikasi rantai hash atas 1,5 juta baris selesai dalam
 **± 15,5 menit** dan hasilnya benar (rantai utuh, 1.500.002 baris diperiksa).
@@ -637,6 +686,28 @@ lingkup Bagian 7 dan perubahannya menyentuh `AuditLogger` yang sedang juga
 menjadi pokok Temuan 1 dan 2 — ketiganya sebaiknya dikerjakan bersama,
 dengan uji regresi yang memeriksa keduanya: hasil verifikasi tetap sama, dan
 waktunya lurus.
+
+**Cara ini ditutup (KEP-020).** Ketiganya memang dikerjakan bersama.
+`verifyChain()` kini memakai `lazyById(500)` — keyset, bukan OFFSET — dan
+**tidak lagi menghidrasi model**: hash dihitung dari baris mentah
+`DB::table('audit_logs')->select([...])`, sehingga 1,5 juta objek Eloquent
+dengan cast JSON pada dua kolom tidak lagi dibuat. Yang berubah adalah bentuk
+kurvanya, bukan konstantanya. Diukur ulang pada `sid_desa_volume` dengan
+kedua lingkaran meng-hash setiap baris agar sebanding:
+
+| baris | lama `lazy()` | baru `lazyById()` | lipat |
+|---|---|---|---|
+| 100.000 | 7,6 s | 0,7 s | 10,4× |
+| 200.000 | 25,2 s | 1,7 s | 15,0× |
+| 400.000 | 86,5 s | 2,9 s | 30,4× |
+| 800.000 | 307,5 s | 7,2 s | 42,6× |
+| 1.500.081 | ± 930 s (angka tabel di atas) | 14,8 s | ± 63× |
+
+Angka "lama" dari alat ukur itu cocok dengan tabel di awal butir ini dalam
+2–3% (7,6 melawan 7,5 s pada 100.000 baris), sehingga kedua kolom sebanding;
+baris 1,5 juta memakai angka pengukuran ini karena mengulangnya memerlukan
+± 15 menit untuk sesuatu yang sudah terukur. 15× data kini menjadi 21× waktu,
+bukan 122×.
 
 ---
 

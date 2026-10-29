@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\AuditLog;
 use App\Support\NameNormalizer;
 use App\Support\Pii\Nik;
 use App\Support\Pii\PiiCipher;
@@ -543,13 +544,14 @@ final class VolumeSeeder extends Seeder
      * bersamaan sama sekali, sehingga penguncian itu tidak melindungi apa pun
      * dan dapat ditinggalkan tanpa mengubah hasilnya.
      *
-     * Bentuk payload hash SENGAJA menyalin App\Models\AuditLog::computeHash()
-     * daripada memanggilnya lewat model: membuat 1,5 juta instance Eloquent
-     * hanya untuk menghitung satu sha256 adalah biaya terbesar di seluruh
-     * penyemai ini. Konsekuensi yang harus diingat: bila computeHash() diubah,
-     * metode ini WAJIB diubah bersamanya — dan
-     * tests/Feature/Volume/VolumeSeederTest.php akan gagal bila lupa, karena
-     * ia memverifikasi rantainya lewat AuditLogger yang asli.
+     * Hash dihitung lewat App\Models\AuditLog::hashFromRow(), yang menerima
+     * array mentah dan karena itu tidak memaksa penyemai ini membuat 1,5 juta
+     * instance Eloquent — biaya terbesar di seluruh penyemai bila model yang
+     * dipakai. Sebelum KEP-020 metode itu belum ada, sehingga penyemai ini
+     * MENYALIN rumusnya; salinan itulah yang membuat rumus penyemai dan rumus
+     * model menyimpang tanpa ada yang menyadarinya sampai uji beban Sprint 7.
+     * Satu rumus di satu tempat adalah inti perbaikannya: tidak ada lagi
+     * salinan yang dapat tertinggal.
      */
     private function seedAuditLogs(int $target): void
     {
@@ -591,19 +593,28 @@ final class VolumeSeeder extends Seeder
             $createdAt = $start->copy()->addSeconds((int) ($spanSeconds * $i / $target));
             $action = $actions[$i % count($actions)];
             /*
-             * SATU kunci saja di dalam `context`, dan itu bukan kebetulan.
+             * DUA kunci di dalam `context`, dan urutannya sengaja tidak
+             * menurut abjad maupun panjang kunci.
              *
-             * Kolom `context` bertipe JSON, dan MySQL MENATA ULANG kunci objek
-             * JSON saat menyimpannya (urut panjang kunci, lalu bytewise). Hash
-             * rantai dihitung dari array PHP sebelum disimpan, tetapi
-             * diverifikasi dari array yang dibaca KEMBALI dari MySQL —
-             * sehingga dua kunci yang urutannya berubah membuat seluruh
-             * rantai 1,5 juta baris tampak rusak, dan `sid:verify-audit-chain`
-             * melaporkan insiden Sev-1 yang tidak pernah terjadi. Ditemukan
-             * tepat begitu: baris pertama hasil penyemai langsung dinyatakan
-             * rusak. Dengan satu kunci, tidak ada urutan yang dapat berubah.
+             * Sebelum KEP-020 di sini hanya ada satu kunci, justru untuk
+             * menghindari cacat yang kini sudah ditutup: kolom `context`
+             * bertipe JSON, dan MySQL MENATA ULANG kunci objek JSON saat
+             * menyimpannya (urut panjang kunci, lalu bytewise). Rumus lama
+             * meng-encode menurut urutan tulis, sehingga baris berkunci banyak
+             * dibaca kembali dengan urutan yang berbeda dan `sid:verify-audit-chain`
+             * melaporkan insiden Sev-1 yang tidak pernah terjadi — ditemukan
+             * tepat begitu, pada baris pertama hasil penyemai ini.
+             *
+             * Rumus baru mengurutkan kunci sebelum meng-encode, jadi dua kunci
+             * di sini bukan lagi risiko melainkan PEMBUKTIAN pada 1,5 juta
+             * baris bahwa penataan ulang MySQL sudah tidak berpengaruh.
+             * `sumber` ditulis lebih dulu padahal MySQL akan mengembalikannya
+             * SETELAH `urut` (enam huruf melawan empat), jadi setiap baris
+             * penyemai ini dibaca kembali dengan urutan kunci yang berbeda
+             * dari urutan tulisnya — bila kanonikalisasi hilang lagi,
+             * penyemai inilah yang pertama berteriak, pada baris pertama.
              */
-            $context = ['urut' => $i];
+            $context = ['sumber' => 'penyemai-volume', 'urut' => $i];
 
             $row = [
                 'actor_id' => $actor->id,
@@ -612,16 +623,25 @@ final class VolumeSeeder extends Seeder
                 'action' => $action,
                 'entity_type' => null,
                 'entity_id' => null,
+                /*
+                 * `null`, dan kini itu benar-benar masuk ke hash (KEP-020):
+                 * sebelum perbaikan, kolom ini tidak pernah ikut dihitung.
+                 * Dibiarkan kosong agar ukuran baris — dan karena itu angka
+                 * uji beban di docs/23 §5 — tetap sebanding dengan pengukuran
+                 * sebelumnya; perlindungan kolom ini dijaga uji regresinya
+                 * sendiri, tests/Feature/AuditLogTest::perubahan_kolom_changes_terdeteksi.
+                 */
                 'changes' => null,
                 'context' => json_encode($context, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
                 'ip_address' => '10.0.0.'.($i % 254),
                 'user_agent' => 'k6/uji-beban',
                 'correlation_id' => null,
                 'prev_hash' => $prevHash,
+                'hash_version' => AuditLog::HASH_VERSION,
                 'created_at' => $createdAt->format('Y-m-d H:i:s.v'),
             ];
 
-            $prevHash = $this->chainHash($row, $context);
+            $prevHash = AuditLog::hashFromRow($row, $row['prev_hash']);
             $row['row_hash'] = $prevHash;
 
             $buffer[] = $row;
@@ -643,50 +663,6 @@ final class VolumeSeeder extends Seeder
             '  %s baris audit log disemai (rantai hash utuh).',
             number_format($target, 0, ',', '.')
         ));
-    }
-
-    /**
-     * Salinan App\Models\AuditLog::computeHash() — lihat keterangan
-     * seedAuditLogs() untuk alasan mengapa ia tidak dipanggil lewat model.
-     *
-     * @param  array<string, mixed>  $row
-     * @param  array<string, mixed>  $context
-     */
-    private function chainHash(array $row, array $context): string
-    {
-        return hash('sha256', json_encode([
-            'prev' => $row['prev_hash'],
-            'actor_id' => $row['actor_id'],
-            'actor_name' => $row['actor_name'],
-            'action' => $row['action'],
-            'entity_type' => $row['entity_type'],
-            'entity_id' => $row['entity_id'],
-            /*
-             * `[]`, BUKAN $row['changes'] — dan ini bukan pilihan, melainkan
-             * penyesuaian terhadap perilaku nyata AuditLog::computeHash().
-             *
-             * Di dalam kelas model, `$this->changes` TIDAK mengenai kolom
-             * `changes`: ia mengenai properti protected `$changes` milik
-             * Illuminate\Database\Eloquent\Concerns\HasAttributes (daftar
-             * atribut yang berubah setelah save), yang pada baris yang baru
-             * dibaca selalu `[]`. Dari luar kelas properti itu tidak
-             * terjangkau, sehingga `$entry->changes` justru mengembalikan isi
-             * kolomnya — dua nilai berbeda untuk nama yang sama.
-             *
-             * Penyemai WAJIB mengikuti apa yang dilakukan computeHash(), bukan
-             * apa yang seharusnya dilakukannya, karena verifikasinya memakai
-             * computeHash() yang sama. Akibatnya yang jauh lebih penting
-             * dicatat sebagai temuan di docs/23-uji-beban-sprint-7.md §7:
-             * kolom `changes` tidak pernah masuk ke rantai hash, sehingga
-             * nilai lama/baru data penduduk dapat diubah di luar aplikasi
-             * tanpa merusak rantai. Memperbaikinya membatalkan hash SELURUH
-             * baris yang sudah ada dan karena itu bukan pekerjaan uji beban.
-             */
-            'changes' => [],
-            'context' => $context,
-            'ip_address' => $row['ip_address'],
-            'created_at' => $row['created_at'],
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 
     /**
