@@ -1,5 +1,5 @@
 # 07 — UI/UX & Information Architecture
-**Proyek:** Sistem Informasi Desa (SID) · **Versi:** 1.0
+**Proyek:** Sistem Informasi Desa (SID) · **Versi:** 1.1
 
 ---
 
@@ -167,6 +167,47 @@ kinerja di jaringan lemah, dan ketahanan bila CDN terblokir.
 | **Notifikasi** | *Toast* untuk konfirmasi singkat; *banner* untuk hal yang perlu tindakan; lonceng untuk riwayat |
 | **Dialog konfirmasi** | Judul berupa pertanyaan, isi menjelaskan akibat, tombol memakai kata kerja ("Hapus Penduduk", bukan "OK") |
 | **Skeleton** | Untuk pemuatan > 300 ms; bukan *spinner* penuh halaman |
+
+### 4.1 Lapisan rupa portal publik
+
+Portal publik dirender Blade (KEP-016) dan karena itu tidak dapat memakai
+komponen Vue di tabel atas. Bentuk yang berulang di sembilan halamannya
+dikumpulkan sebagai kelas utilitas di `resources/css/app.css`, bukan ditulis
+ulang per halaman — sebelum dikumpulkan, setiap halaman menyusun sendiri
+"kartu dengan judul di dalamnya", dan hasilnya sembilan ukuran jarak, tebal
+judul, dan warna garis yang berbeda-beda.
+
+| Kelas | Dipakai untuk |
+|-------|---------------|
+| `.panel` + `.panel-head` / `.panel-body` / `.panel-accent` | Kartu dengan baris kepala terpisah garis — bentuk dasar seluruh halaman dalam portal |
+| `.badge` + `.badge-success` / `-accent` / `-neutral` / `-gold` | Penanda kecil: biaya, status pengaduan, jenis tulisan, jabatan |
+| `.chip` | Keping keterangan ber-ikon: lama penyelesaian, jumlah syarat, lokasi kegiatan |
+| `.bar-track` + `.bar-fill` (`-flat`, `-gold`, `.bar-track-rtl`) | Grafik batang statistik; piramida penduduk memakai batang polos dua arah |
+| `.spec-row` + `.spec-label` / `.spec-value` | Baris label–nilai pada ringkasan layanan, letak wilayah, jam layanan |
+| `.steps` | Langkah bernomor dengan garis penghubung (cara mengajukan surat) |
+| `.date-block` | Blok tanggal agenda: angka besar di atas bulan |
+| `.link-arrow` | Tautan "lanjut" dengan anak panah yang bergeser saat kartunya disorot |
+| `.band-emblem`, `.cover-fallback`, `.quote-panel` | Hiasan: cap air lambang desa, pengganti gambar muka tulisan, tanda petik visi–misi |
+| `.aside-sticky` | Ringkasan di kolom kanan halaman detail yang ikut tergulir |
+
+Tiga aturan yang mengikat seluruh lapisan ini:
+
+1. **Digambar CSS, bukan gambar.** Portal dibatasi 500 KB pada muatan pertama
+   (NFR-PERF-04) dan satu foto lebar menghabiskan separuhnya di jaringan desa.
+   Gradien, motif, cap air, dan pengganti gambar muka tidak menambah satu pun
+   permintaan jaringan.
+2. **Memakai token semantik, bukan warna tetap.** Mode gelap ikut benar dengan
+   sendirinya; tidak ada satu pun varian `dark:` di tampilan portal.
+3. **Tidak bergantung JavaScript.** Termasuk penanda "buka sekarang" pada
+   halaman kontak, yang dihitung di server dari jam dinding desa
+   (`App\Support\VillageTime`) — bukan dari jam peramban pengunjung.
+
+> **Belum selesai:** jam layanan pada halaman kontak masih berupa larik di
+> berkas tampilan. Tabel jam layanan dan penanda "buka sekarang" sudah membaca
+> **satu** larik yang sama, sehingga keduanya tidak dapat menyimpang — tetapi
+> begitu modul pengaturan desa menerima kolom jam layanan, larik itu harus
+> pindah ke sana. Jam layanan yang salah di situs resmi membuat warga datang ke
+> kantor yang tutup.
 
 ---
 

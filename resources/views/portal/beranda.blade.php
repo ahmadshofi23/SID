@@ -8,6 +8,15 @@
       separuhnya di jaringan yang justru dipakai warga desa.
     --}}
     <section class="portal-band portal-weave border-b border-line">
+        {{-- Cap air lambang desa, sama dengan kop halaman dalam (.band-emblem):
+             mengisi ruang kanan hero tanpa satu pun berkas gambar. --}}
+        <svg class="band-emblem" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+            <path d="M10 18v-7"/><path d="M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z"/>
+            <path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M3 22h18"/><path d="M6 18v-7"/>
+        </svg>
+
         <div class="mx-auto max-w-5xl px-4 py-14 sm:py-16">
             <p class="eyebrow">
                 <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -121,9 +130,13 @@
                     @endforeach
                 </dl>
 
-                <p class="mt-4 text-sm">
-                    <a href="{{ route('portal.statistik') }}" class="font-medium text-accent hover:underline">
-                        Statistik lengkap penduduk &rarr;
+                <p class="mt-4">
+                    <a href="{{ route('portal.statistik') }}" class="link-arrow text-sm">
+                        Statistik lengkap penduduk
+                        <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                        </svg>
                     </a>
                 </p>
             @endif
@@ -173,9 +186,12 @@
                     Syarat, biaya, dan lama penyelesaian tiap surat.
                 </p>
             </div>
-            <a href="{{ route('portal.layanan') }}"
-               class="text-sm font-medium text-accent hover:underline">
-                Semua layanan ({{ $jumlahLayanan }}) &rarr;
+            <a href="{{ route('portal.layanan') }}" class="link-arrow text-sm">
+                Semua layanan ({{ $jumlahLayanan }})
+                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                </svg>
             </a>
         </div>
 
@@ -203,8 +219,8 @@
                                 {{ \Illuminate\Support\Str::limit($jenis->description, 80) }}
                             </span>
 
-                            <span class="mt-4 flex items-center gap-2 border-t border-line pt-3 text-xs">
-                                <span class="tabular inline-flex items-center gap-1 text-content-tertiary">
+                            <span class="mt-4 flex items-center gap-2 border-t border-line pt-3">
+                                <span class="chip tabular">
                                     <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                          aria-hidden="true">
@@ -212,7 +228,7 @@
                                     </svg>
                                     {{ $jenis->sla_days }} hari kerja
                                 </span>
-                                <span class="ml-auto rounded-md px-2 py-0.5 font-medium {{ (float) $jenis->fee > 0 ? 'bg-surface-sunken text-content-secondary' : 'bg-success-soft text-success' }}">
+                                <span class="badge ml-auto {{ (float) $jenis->fee > 0 ? 'badge-neutral' : 'badge-success' }}">
                                     {{ (float) $jenis->fee > 0 ? 'Rp '.number_format((float) $jenis->fee, 0, ',', '.') : 'Gratis' }}
                                 </span>
                             </span>
@@ -236,8 +252,12 @@
             <div class="mx-auto max-w-5xl px-4 py-14">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                     <h2 id="judul-kabar" class="heading-rule text-2xl font-semibold tracking-tight">Kabar Desa</h2>
-                    <a href="{{ route('portal.berita') }}" class="text-sm font-medium text-accent hover:underline">
-                        Semua berita &rarr;
+                    <a href="{{ route('portal.berita') }}" class="link-arrow text-sm">
+                        Semua berita
+                        <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                        </svg>
                     </a>
                 </div>
 

@@ -447,3 +447,318 @@
         background-color: rgb(var(--accent) / 0.18);
     }
 }
+
+/* ============================================================================
+   Lapisan rupa portal publik — komponen berulang
+
+   MENGAPA DIKUMPULKAN DI SINI, BUKAN DITULIS PER HALAMAN: sebelum ini setiap
+   halaman portal menyusun sendiri "kartu dengan judul di dalamnya", dan
+   hasilnya sembilan halaman dengan sembilan ukuran jarak, tebal judul, dan
+   warna garis yang berbeda-beda. Perbedaan sekecil itu tidak pernah disadari
+   satu per satu, tetapi terbaca sebagai situs yang disusun seadanya.
+
+   Aturannya tetap sama dengan lapisan di atas: digambar CSS (tanpa gambar,
+   tanpa JavaScript), memakai token semantik sehingga mode gelap ikut benar
+   dengan sendirinya, dan hiasan tidak pernah berada di belakang teks yang
+   harus dibaca.
+   ========================================================================== */
+@layer utilities {
+    /* ---------------------------------------------------------------- Panel
+       Kartu dengan baris kepala yang terpisah garis. Judul bagian jadi
+       terbaca sebagai bagian dari kartunya, bukan teks yang melayang di
+       atasnya — bentuk yang sama dipakai seluruh halaman dalam portal.      */
+    .panel {
+        background-color: var(--color-surface);
+        border: 1px solid var(--color-line);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+
+    .panel-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        border-bottom: 1px solid var(--color-line);
+        background-color: color-mix(in srgb, var(--color-surface-sunken) 60%, var(--color-surface));
+        padding: 0.875rem 1.25rem;
+    }
+
+    .panel-title {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    .panel-body { padding: 1.25rem; }
+
+    /* Garis tipis warna merek di tepi atas panel yang ingin ditonjolkan. */
+    .panel-accent { border-top: 2px solid var(--color-accent); }
+
+    /* ------------------------------------------------------------- Lencana
+       Satu bentuk untuk semua penanda kecil: biaya, status, jenis tulisan.
+       Dipakai bersama salah satu varian warna di bawahnya.                  */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        border-radius: 9999px;
+        padding: 0.15rem 0.55rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.5;
+        white-space: nowrap;
+    }
+
+    .badge-success {
+        background-color: var(--color-success-soft);
+        color: var(--color-success);
+        border: 1px solid rgb(var(--success) / 0.25);
+    }
+
+    .badge-accent {
+        background-color: var(--color-accent-soft);
+        color: var(--color-accent-text);
+        border: 1px solid rgb(var(--accent) / 0.22);
+    }
+
+    .badge-neutral {
+        background-color: var(--color-surface-sunken);
+        color: var(--color-content-secondary);
+        border: 1px solid var(--color-line);
+    }
+
+    .badge-gold {
+        background-color: rgb(var(--gold) / 0.12);
+        color: color-mix(in srgb, rgb(var(--gold)) 75%, var(--color-content));
+        border: 1px solid rgb(var(--gold) / 0.3);
+    }
+
+    /* Keping keterangan: ikon + angka kecil (lama penyelesaian, tanggal). */
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        border-radius: 0.5rem;
+        background-color: var(--color-surface-sunken);
+        border: 1px solid var(--color-line);
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        color: var(--color-content-secondary);
+    }
+
+    /* ------------------------------------------------------- Batang grafik
+       Pengganti <span class="h-3 bg-accent"> yang dipakai halaman statistik.
+       Jalurnya kini terlihat juga saat nilainya kecil, sehingga batang 1%
+       tidak tampak seperti data yang hilang.                               */
+    .bar-track {
+        position: relative;
+        height: 0.625rem;
+        flex: 1 1 auto;
+        min-width: 0;
+        border-radius: 9999px;
+        background-color: var(--color-surface-sunken);
+        box-shadow: inset 0 0 0 1px var(--color-line);
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        display: block;
+        height: 100%;
+        min-width: 2px;
+        border-radius: 9999px;
+        background-image: linear-gradient(to right, var(--color-accent), color-mix(in srgb, var(--color-accent) 62%, rgb(var(--gold))));
+    }
+
+    /*
+     * Piramida penduduk memakai batang POLOS, bukan bergradien: dua batang
+     * saling berhadapan pada satu baris, dan gradien membuat ujung batang
+     * hijau berwarna kekuningan tepat di sebelah batang emas — dua warna
+     * yang justru harus dapat dibedakan sekilas.
+     */
+    .bar-fill-flat {
+        background-image: none;
+        background-color: var(--color-accent);
+    }
+
+    .bar-fill-gold {
+        background-image: none;
+        background-color: rgb(var(--gold));
+    }
+
+    /* Batang yang tumbuh dari kanan ke kiri (sisi laki-laki pada piramida). */
+    .bar-track-rtl > .bar-fill { margin-left: auto; }
+
+    /* ---------------------------------------------------------- Baris rincian
+       Label di kiri, nilai di kanan, dengan garis pemisah tipis — bentuk yang
+       dipakai "Ringkasan layanan", "Letak & wilayah", dan jam layanan.      */
+    .spec-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.625rem 0;
+        border-top: 1px solid var(--color-line);
+    }
+
+    .spec-row:first-child { border-top: 0; padding-top: 0; }
+
+    .spec-label {
+        font-size: 0.8125rem;
+        color: var(--color-content-tertiary);
+    }
+
+    .spec-value {
+        font-weight: 600;
+        text-align: right;
+    }
+
+    /* ----------------------------------------------------------- Langkah urut
+       Daftar bernomor dengan garis penghubung antar langkah. Garisnya
+       digambar pada ::before tiap butir dan dimatikan pada butir terakhir,
+       jadi tidak ada elemen kosong yang harus ditulis di tampilan.          */
+    .steps { counter-reset: langkah; }
+
+    .steps > li {
+        position: relative;
+        counter-increment: langkah;
+        padding-left: 2.75rem;
+        padding-bottom: 1.125rem;
+    }
+
+    .steps > li:last-child { padding-bottom: 0; }
+
+    .steps > li::before {
+        content: counter(langkah);
+        position: absolute;
+        left: 0;
+        top: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 9999px;
+        background-color: var(--color-accent-soft);
+        border: 1px solid rgb(var(--accent) / 0.25);
+        color: var(--color-accent-text);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .steps > li:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 0.875rem;
+        top: 1.875rem;
+        bottom: 0.25rem;
+        width: 1px;
+        background-color: var(--color-line);
+    }
+
+    /* ------------------------------------------------------------- Tanggal
+       Blok tanggal agenda: angka besar di atas bulan. Dipakai sebagai
+       pengganti satu baris "12 Mei 2026" pada daftar kegiatan, karena yang
+       dicari orang pada daftar agenda adalah TANGGALNYA.                    */
+    .date-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 3.25rem;
+        height: 3.25rem;
+        flex-shrink: 0;
+        border-radius: 0.625rem;
+        border: 1px solid rgb(var(--accent) / 0.22);
+        background-color: var(--color-accent-soft);
+        color: var(--color-accent-text);
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .date-block > .date-day { font-size: 1.25rem; font-weight: 700; }
+    .date-block > .date-month { font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* ------------------------------------------------------------- Tautan
+       Tautan "lanjut" dengan anak panah yang bergeser sedikit saat disorot.
+       Satu kelas, supaya tidak ditulis ulang di sembilan halaman.           */
+    .link-arrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-weight: 500;
+        color: var(--color-accent);
+    }
+
+    .link-arrow > svg { transition: transform 0.18s var(--ease-out-smooth); }
+    .link-arrow:hover { text-decoration: underline; }
+
+    /* Anak panahnya ikut bergeser ketika YANG DISOROT adalah kartu di
+       sekelilingnya, bukan hanya tautannya sendiri — di dalam kartu, seluruh
+       permukaannya memang satu tautan. */
+    .link-arrow:hover > svg,
+    .group:hover .link-arrow > svg { transform: translateX(2px); }
+
+    /* --------------------------------------------------------- Kop halaman
+       Lambang desa sebagai cap air di sudut bidang kepala halaman. Besar,
+       tetapi beralfa 0,05: ia mengisi ruang kosong di kanan judul tanpa
+       pernah bersaing dengan teksnya. Disembunyikan di ponsel, tempat judul
+       memakai seluruh lebar layar.                                          */
+    .band-emblem {
+        position: absolute;
+        z-index: -1;
+        pointer-events: none;
+        right: -1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 15rem;
+        height: 15rem;
+        color: var(--color-accent);
+        opacity: 0.05;
+        display: none;
+    }
+
+    @media (min-width: 768px) {
+        .band-emblem { display: block; }
+    }
+
+    /* ------------------------------------------------------ Panel melekat
+       Ringkasan di kolom kanan halaman detail ikut tergulir sampai batas
+       isinya. 5,5rem = tinggi kepala halaman yang melekat + jaraknya.       */
+    @media (min-width: 1024px) {
+        .aside-sticky { position: sticky; top: 5.5rem; }
+    }
+
+    /* ----------------------------------------------------- Kutipan visi-misi
+       Tanda petik besar sebagai latar, digambar dari teks — bukan gambar,
+       dan tidak dibacakan pembaca layar karena ia ::before dekoratif.       */
+    .quote-panel { position: relative; isolation: isolate; }
+
+    .quote-panel::before {
+        content: '\201C';
+        position: absolute;
+        z-index: -1;
+        right: 0.75rem;
+        top: -0.75rem;
+        font-size: 5rem;
+        line-height: 1;
+        font-weight: 700;
+        color: var(--color-accent);
+        opacity: 0.1;
+    }
+
+    /* ------------------------------------------------- Pengganti gambar muka
+       Kartu berita tanpa gambar muka sebelumnya lebih pendek dari kartu yang
+       punya, sehingga satu baris tiga kartu tampak patah. Bidang bermotif ini
+       mengisi tempatnya tanpa menambah satu pun permintaan jaringan.        */
+    .cover-fallback {
+        position: relative;
+        background-color: var(--color-surface-sunken);
+        background-image:
+            radial-gradient(18rem 10rem at 20% -30%, rgb(var(--accent) / 0.2), transparent 65%),
+            radial-gradient(14rem 9rem at 95% 120%, rgb(var(--gold) / 0.14), transparent 60%),
+            repeating-linear-gradient(135deg, rgb(var(--accent) / 0.09) 0 1px, transparent 1px 9px);
+    }
+}

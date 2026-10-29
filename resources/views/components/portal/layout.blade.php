@@ -3,6 +3,14 @@
     'description' => null,
     'heading' => null,
     'lead' => null,
+    /*
+     * Jejak jalan tingkat dua, mis. Layanan > Surat Keterangan Tidak Mampu.
+     * Bentuknya ['label' => ..., 'url' => ...]; bila tidak diisi, jejaknya
+     * tetap dua ruas seperti sebelumnya (Beranda > halaman ini).
+     */
+    'parent' => null,
+    /* Label kecil di atas judul: "Standar pelayanan", "Agenda", dan sejenisnya. */
+    'eyebrow' => null,
 ])
 
 {{--
@@ -266,18 +274,46 @@
           tombol kembali peramban.
         --}}
         <div class="portal-band portal-weave border-b border-line">
-            <div class="mx-auto max-w-5xl px-4 py-10 sm:py-12">
-                <nav class="flex items-center gap-1.5 text-xs text-content-tertiary" aria-label="Jejak jalan">
+            {{-- Cap air lambang desa: mengisi ruang kosong di kanan judul,
+                 beralfa 0,05 dan di luar alur bacaan (lihat .band-emblem). --}}
+            <svg class="band-emblem" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true">
+                <path d="M10 18v-7"/><path d="M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z"/>
+                <path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M3 22h18"/><path d="M6 18v-7"/>
+            </svg>
+
+            <div class="mx-auto max-w-5xl px-4 py-10 sm:py-14">
+                <nav class="flex flex-wrap items-center gap-1.5 text-xs text-content-tertiary" aria-label="Jejak jalan">
                     <a href="{{ route('portal.beranda') }}" class="hover:text-accent hover:underline">Beranda</a>
                     <span aria-hidden="true">/</span>
+                    @if ($parent)
+                        <a href="{{ $parent['url'] }}" class="hover:text-accent hover:underline">{{ $parent['label'] }}</a>
+                        <span aria-hidden="true">/</span>
+                    @endif
                     <span class="truncate font-medium text-content-secondary" aria-current="page">{{ $title }}</span>
                 </nav>
 
-                <h1 class="heading-rule mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">{{ $heading }}</h1>
+                <div class="mt-4 flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+                    <div class="min-w-0">
+                        @if ($eyebrow)
+                            <p class="eyebrow mb-3">{{ $eyebrow }}</p>
+                        @endif
 
-                @if ($lead)
-                    <p class="mt-4 max-w-2xl text-content-secondary">{{ $lead }}</p>
-                @endif
+                        <h1 class="heading-rule text-2xl font-semibold leading-tight tracking-tight sm:text-[2rem]">{{ $heading }}</h1>
+
+                        @if ($lead)
+                            <p class="mt-4 max-w-2xl leading-relaxed text-content-secondary">{{ $lead }}</p>
+                        @endif
+                    </div>
+
+                    {{-- Tindakan utama halaman, mis. "Ajukan daring" pada satu
+                         jenis surat. Kosong pada halaman yang tidak mengisinya,
+                         dan tata letaknya menutup rapat dengan sendirinya. --}}
+                    @isset($actions)
+                        <div class="flex flex-wrap items-center gap-3">{{ $actions }}</div>
+                    @endisset
+                </div>
             </div>
         </div>
     @endif
