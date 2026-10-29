@@ -32,7 +32,7 @@ konsistensi lintas layanan) tanpa manfaat nyata pada skala satu desa sampai ratu
 
 | Lapis | Teknologi | Alasan |
 |-------|-----------|--------|
-| Bahasa/Framework | **PHP 8.3 + Laravel 11** | Ekosistem pemerintahan desa di Indonesia mayoritas PHP; mudah mencari pengembang & penyedia hosting; *batteries included* (queue, auth, migration, policy, scheduler) |
+| Bahasa/Framework | **PHP 8.4+ + Laravel 13** | Ekosistem pemerintahan desa di Indonesia mayoritas PHP; mudah mencari pengembang & penyedia hosting; *batteries included* (queue, auth, migration, policy, scheduler) |
 | Basis data | **MySQL 8.0** (KEP-002) | Paling mudah di-*hosting* di Indonesia; kolam SDM pemeliharaan paling luas; InnoDB mendukung transaksi & `FOR UPDATE` yang dibutuhkan penomoran surat. Keterbatasannya (tanpa RLS, tanpa *partial index*, tanpa `pg_trgm`) sudah punya padanan — lihat 05 §9 |
 | Frontend panel | **Inertia.js + React + TypeScript + Tailwind** | Satu bahasa tipe aman di frontend, tanpa beban membangun API publik ganda untuk kebutuhan internal |
 | Frontend portal publik | **Blade + sedikit JS (SSR)** | SEO & LCP terbaik, *payload* paling kecil, tanpa hidrasi berat |

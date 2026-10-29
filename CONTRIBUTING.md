@@ -2,7 +2,9 @@
 
 ## Menyiapkan lingkungan lokal
 
-**Prasyarat:** PHP 8.3+, Composer 2, MySQL 8.0, Redis 7.
+**Prasyarat:** PHP 8.4+, Composer 2, MySQL 8.0, Redis 7.
+PHP 8.3 **tidak cukup**: komponen Symfony 8 yang dibawa Laravel 13 menuntut
+`>= 8.4.1`, dan `composer install` akan menolak dengan menyebut paketnya.
 
 ```bash
 make setup      # pasang dependensi, siapkan .env, migrasi + data contoh
