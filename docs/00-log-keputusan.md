@@ -784,6 +784,107 @@ pertanyaan itu sendiri adalah bentuk pembukaan keanoniman.
 
 ---
 
+## KEP-019 — Indeks penutup untuk halaman Laporan, dan mengapa indeks terpisah ditolak
+**Tanggal:** 2026-10-24 · **Status:** Wajib · **Kategori:** kinerja, model data
+
+**Masalah yang ditemukan:** uji beban & volume Sprint 7
+(`docs/23-uji-beban-sprint-7.md`) menyemai 20.000 penduduk — volume sasaran
+resmi proyek (NFR-PERF-07) — lalu mengukur setiap halaman. Satu halaman
+melewati NFR-PERF-01 (p95 baca ≤ 500 ms) **sendirian**:
+`ReportService::population()` terukur **755 ms**.
+
+Sebabnya bukan satu kueri yang rumit, melainkan **enam kali membaca tabel yang
+sama**. Halaman Laporan menampilkan rekap per wilayah dan per lima kategori
+(jenis kelamin, agama, pendidikan, pekerjaan, status perkawinan). Setiap rekap
+menyaring `status = 'aktif' AND deleted_at IS NULL`, lalu membaca **satu kolom
+lain** per baris. Indeks `idx_residents_status` hanya memuat kedua kolom
+penyaring itu, sehingga kolom kategorinya harus diambil dari indeks berkluster
+— 19.600 pencarian baris acak, per rekap, dengan kunci primer CHAR(36).
+Terukur 70–88 ms untuk setiap kategori, dan 370 ms untuk rekap per wilayah
+yang bahkan menghidrasi 20.000 objek Eloquent hanya untuk menambahkannya ke
+tiga penghitung.
+
+Yang pantas dicatat adalah **mengapa ini tidak pernah terlihat sampai Sprint
+7**: basis data pengembangan berisi 500 penduduk (docs/09 §3), dan pada 500
+baris keenam pembacaan itu masing-masing 2 ms. Halaman ini tidak pernah
+melambat di mana pun yang dilihat orang — ia hanya akan melambat di desa,
+setelah impor data kependudukan yang sebenarnya.
+
+**Pilihan yang dipertimbangkan:**
+(a) biarkan, dan andalkan cache halaman;
+(b) tabel ringkasan seperti `population_stats` (ADR-007) untuk laporan juga;
+(c) indeks penutup **baru** khusus rekap;
+(d) **lebarkan** `idx_residents_status` yang sudah ada;
+(e) satukan kelima rekap menjadi satu kueri `GROUP BY` kombinasi, tanpa
+    indeks baru.
+
+**Keputusan: (d) + (e), dua-duanya.**
+
+1. **`idx_residents_status` dilebarkan** dari `(status, deleted_at)` menjadi
+   `(status, deleted_at, region_id, gender, religion_code, education_code,
+   occupation_code, marital_status_code)` — migrasi
+   `2026_01_08_000100_widen_residents_status_index_for_reports.php`.
+2. **Kelima rekap kategori menjadi SATU kueri**
+   (`ResidentRepository::recapByCategories()`), dikelompokkan menurut
+   kombinasi kelima kolom lalu dijumlahkan per kolom di PHP — pekerjaan di
+   bawah satu milidetik atas ratusan baris kombinasi.
+3. **Rekap per wilayah dihitung basis data** (`GROUP BY region_id, gender`,
+   ± 24 baris), bukan dengan memuat seluruh penduduk. Pemetaan RT → dusun
+   memakai satu kueri tabel `regions` dan segmen pertama kolom `path`.
+
+Hasil terukur pada 20.000 penduduk, mesin yang sama:
+
+| | sebelum | sesudah |
+|---|---|---|
+| rekap per wilayah | 370 ms | 10 ms |
+| rekap lima kategori | 385 ms | 22 ms |
+| `ReportService::population()` | 755 ms | 43 ms |
+| halaman `/laporan`, waktu basis data | 495 ms | 66 ms |
+
+**Mengapa (c) ditolak, dan ini alasan yang hanya muncul setelah diukur:**
+indeks penutup terpisah memang membuat kelima kueri lama menjadi 10–22 ms —
+**tetapi hanya dengan `FORCE INDEX`**. Pengoptimasi MySQL tetap memilih
+`idx_residents_status` yang lebih sempit karena biaya perkiraannya lebih
+rendah, dan `EXPLAIN` menunjukkan indeks baru itu tidak pernah dipakai dengan
+sendirinya. Petunjuk indeks di dalam Eloquent adalah janji yang patah tanpa
+suara pada versi MySQL berikutnya, dan kegagalannya tidak berupa galat
+melainkan halaman yang perlahan melambat — kelas bug yang tidak pernah
+terlihat di CI. Melebarkan indeks yang **sudah** dipilih menghapus pilihan
+yang perlu dipaksakan. Nama indeksnya pun sengaja dipertahankan, karena dua
+kolom pertamanya tetap sama persis sehingga tidak ada satu pun rencana kueri
+lain yang berubah.
+
+**Mengapa (b) ditolak:** `population_stats` memang sudah ada, tetapi ia
+**mengabaikan lingkup akses** dengan sengaja (ADR-007: ia hanya menyajikan
+agregat publik). Laporan internal WAJIB mengikuti lingkup — Kepala Dusun
+merekap dusunnya sendiri (docs/04 §4.1) — sehingga ia memerlukan tabel
+ringkasan per wilayah per peran, yaitu cache yang harus dibatalkan setiap kali
+satu penduduk berubah. Satu indeks lebih sederhana dan tidak dapat kedaluwarsa.
+
+**Mengapa (a) ditolak:** laporan yang di-cache adalah laporan yang angkanya
+berbeda dari layar penduduk di sebelahnya, dan perangkat desa akan menemukan
+selisih itu pada saat yang paling buruk — di rapat.
+
+**Konsekuensi yang diterima:**
+
+1. **Enam kolom tambahan (± 110 byte per baris) dibayar pada setiap
+   penyisipan dan setiap perubahan salah satu kolom itu.** Yang ditukar
+   disengaja: di satu desa, perubahan data penduduk berjumlah puluhan per
+   hari dan tidak ada yang menungguinya; halaman Laporan dibuka beberapa kali
+   sehari oleh orang yang menunggu di depan layar.
+2. **Impor massal menjadi sedikit lebih lambat.** Impor 20.000 baris
+   memperbarui satu indeks yang lebih lebar. Pada penyemai volume, selisihnya
+   tidak terukur di atas derau.
+3. **docs/05-model-data.md §3.2 masih menuliskan indeks yang lama.** Sampai
+   dokumen itu diselaraskan, entri ini adalah sumber kebenarannya.
+4. **Daftar putih kolom rekap kini dipakai di dua tempat** (satu kolom dan
+   beberapa kolom). Nama kolom tidak dapat diikat sebagai parameter SQL, jadi
+   daftar putih itu satu-satunya yang memisahkan laporan dari injeksi SQL;
+   ia karena itu dijaga uji sendiri
+   (`tests/Feature/Report/ReportRecapQueryTest.php`).
+
+---
+
 ## KEP-020 — Rumus hash audit log: dua cacat berlawanan arah, dan satu baris mutex
 **Tanggal:** 2026-10-29 · **Status:** Wajib · **Kategori:** integritas bukti, konkurensi, kinerja
 
@@ -993,3 +1094,4 @@ JSON dua kolomnya tidak perlu dibuat.
 - `tests/Feature/Audit/AuditChainConcurrencyTest` — dua belas pencatatan
   bersamaan di proses terpisah semuanya berhasil dan rantainya tetap satu; dan
   pembuktian bahwa baris mutex-lah yang menghapus 1213.
+
