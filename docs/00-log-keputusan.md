@@ -781,3 +781,215 @@ Konsekuensi kedua, lebih halus: `submitted_ip_hash` tidak dapat dibaca
 manusia. Perangkat desa yang ingin tahu "pengaduan ini datang dari mana" tidak
 akan pernah mendapat jawabannya dari basis data, dan memang tidak boleh —
 pertanyaan itu sendiri adalah bentuk pembukaan keanoniman.
+
+---
+
+## KEP-020 — Rumus hash audit log: dua cacat berlawanan arah, dan satu baris mutex
+**Tanggal:** 2026-10-29 · **Status:** Wajib · **Kategori:** integritas bukti, konkurensi, kinerja
+
+**Masalah yang ditemukan.** Uji beban & volume Sprint 7
+(docs/23-uji-beban-sprint-7.md §7) menemukan tiga cacat pada mekanisme rantai
+hash audit log, dan ketiganya sengaja tidak diperbaiki di sana karena dua di
+antaranya menyentuh integritas **bukti** — ADR-005, RULE-12, docs/08 §9 — dan
+bukan kinerja kueri. Entri ini adalah keputusan yang dituntut temuan itu.
+
+Saat memperbaikinya, cacat **keempat** ditemukan: ia tidak terlihat di laporan
+uji beban karena ia dan cacat pertama saling menutupi.
+
+### Empat cacat, dua di antaranya berlawanan arah
+
+**(1) Kolom `changes` tidak pernah ikut di-hash — alarm yang DIAM.**
+`AuditLog::computeHash()` memakai `$this->changes`. Di dalam kelas model, nama
+itu tidak mengenai kolom `changes`: ia mengenai properti protected `$changes`
+milik `Illuminate\Database\Eloquent\Concerns\HasAttributes` — daftar atribut
+yang berubah setelah `save()`, yang di titik itu selalu `[]`. Dari **luar**
+kelas, `$entry->changes` justru mengembalikan isi kolomnya, karena properti
+protected tidak terjangkau dan PHP jatuh ke `__get()`. Dua nilai berbeda untuk
+satu nama, dan yang terpakai justru yang kosong. Akibatnya nilai lama/baru data
+penduduk dapat diubah langsung di basis data **tanpa merusak rantai**, dan
+`sid:verify-audit-chain` tetap melaporkan "rantai utuh" — padahal justru kolom
+itulah yang berisi datanya; sisanya hanya menyebutkan siapa dan kapan.
+Bertahan tujuh sprint tanpa terlihat.
+
+**(2) Urutan kunci JSON tidak kanonik — alarm yang BERBUNYI atas data jujur.**
+Rumus lama meng-encode kedua kolom JSON menurut urutan kunci yang kebetulan
+dipakai pemanggil. MySQL menyimpan kolom JSON dalam bentuk binernya sendiri
+dan mengembalikan kuncinya **terurut** (panjang, lalu leksikal), pada setiap
+tingkat sarang. Baris yang ditulis sebagai
+`{"nomor_surat":…,"jenis_surat":…,"tiket":…}` dibaca kembali sebagai
+`{"tiket":…,"jenis_surat":…,"nomor_surat":…}`; `json_encode` mempertahankan
+urutan masukan, sehingga hash saat verifikasi berbeda dari hash saat penulisan.
+
+Ini bukan cacat kecil, dan bukan pula sekadar kebalikan dari (1). Pada basis
+data pengembangan, `sid:verify-audit-chain` **memang berbunyi "RANTAI RUSAK"**
+— pada baris `letter.issued` id=7, yang tidak pernah disentuh siapa pun. Kami
+membuktikan sebabnya dengan mencoba setiap permutasi kunci pada baris itu:
+hash-nya cocok persis bila kuncinya disusun `nomor_surat, jenis_surat, tiket`,
+yaitu urutan tulisnya. Barisnya utuh; rumusnya yang salah.
+
+Dan akibatnya lebih buruk daripada kebisingan: **alarm integritas bukti yang
+berbunyi atas data jujur akan diabaikan**, dan kendali yang diabaikan sama
+nilainya dengan kendali yang tidak ada. Satu-satunya alasan hal ini belum
+pernah merugikan adalah bahwa tidak ada yang pernah menjalankan perintah itu
+pada basis data yang memuat baris semacam itu — persis sampai uji volume
+Sprint 7 melakukannya.
+
+Kedua cacat ini saling menutupi di laporan uji beban: penyemai volume
+menyesuaikan diri dengan perilaku (1), dan konteks yang dibuatnya berkunci
+tunggal sehingga (2) tidak muncul di sana.
+
+**(3) Deadlock MySQL 1213 pada penulisan bersamaan.** `AuditLogger` merantai
+dengan `ORDER BY id DESC LIMIT 1 FOR UPDATE`. Pada InnoDB kunci itu mencakup
+celah sesudah baris terakhir, dan **gap lock saling kompatibel** — dua
+transaksi dapat memegangnya bersamaan. Begitu keduanya hendak menyisipkan ke
+dalam celah itu, kunci insert-intention yang diperlukan bertentangan dengan gap
+lock transaksi lain, keduanya menunggu, dan MySQL membunuh salah satunya.
+Tidak perlu sumber daya ketiga: dua penulisan audit biasa sudah cukup. Uji
+beban menangkapnya satu kali dalam ± 44 menit pada jalur login; bagi petugas
+yang mengalaminya ia berupa HTTP 500.
+
+**(4) `sid:verify-audit-chain` tumbuh kuadratik.** `verifyChain()` memakai
+`lazy(500)`, yang memecah kueri dengan LIMIT/OFFSET dan bukan dengan kunci.
+Pada potongan terakhir MySQL melewati 1,5 juta baris — dan melakukannya lagi
+untuk setiap potongan. Terukur: setiap kali datanya dua kali lebih banyak,
+waktunya tiga setengah kali lebih lama.
+
+### Keputusan
+
+**1. Satu rumus hash, ditulis satu kali, atas representasi MENTAH baris.**
+`AuditLog::hashFromRow(array $row, ?string $prev)` menjadi satu-satunya tempat
+rumusnya ada. Ia dipanggil dua kali selama hidup sebuah baris: saat penulisan
+(dari atribut model) dan saat verifikasi (dari baris mentah basis data).
+`computeHash()` hanya meneruskan `$this->getAttributes()` kepadanya.
+
+Itu bukan selera gaya. Cacat (1) terjadi **karena** ada dua jalur yang dapat
+menyimpang — `$this->changes` di dalam kelas dan `$entry->changes` di luarnya —
+dan satu-satunya pencegah yang bertahan terhadap orang yang tidak tahu
+tentangnya adalah tidak punya dua jalur. Mengambil nilainya dari atribut
+mentah juga berarti nama kolom tidak dapat lagi bertabrakan dengan properti
+kerangka kerja apa pun, sekarang maupun pada pembaruan Laravel berikutnya.
+
+**2. Kedua kolom JSON di-hash dalam bentuk kanonik** (kunci objek diurutkan
+rekursif; urutan senarai dibiarkan, karena urutan senarai bermakna dan MySQL
+pun mempertahankannya). Dengan itu apa yang dihitung saat penulisan dan saat
+verifikasi tidak dapat lagi berbeda karena cara MySQL menyimpannya.
+
+*Yang ditolak:* menyimpan `changes` dan `context` sebagai `LONGTEXT` agar
+bytenya terjaga apa adanya. Itu memang menghapus masalahnya pada sumbernya,
+tetapi membuang kemampuan menyaring JSON di basis data — yang akan dibutuhkan
+halaman Log Aktivitas — dan menukar satu cacat halus dengan satu migrasi berat
+atas tabel terbesar di sistem.
+
+**3. Kolom `hash_version`, dan baris lama TIDAK dihitung ulang.**
+Mengubah rumusnya membatalkan `row_hash` seluruh baris yang sudah ada. Kolom
+`hash_version` membuat verifikasi tahu rumus mana yang berlaku per baris, tanpa
+menyentuh satu baris lama pun — syarat mutlak pada tabel yang hak akses MySQL-nya
+memang menolak UPDATE.
+
+Yang penting dinyatakan terbuka: **baris v1 tidak dapat dihitung ulang sama
+sekali**, dan itu bukan kelonggaran melainkan sifat cacat (2). Urutan kunci
+JSON saat penulisan **hilang** ketika MySQL menyimpannya; tidak ada cara
+mereproduksinya dari apa yang tersimpan. Karena itu `verifyChain()` memeriksa
+baris v1 hanya pada **sambungannya** (`prev_hash` terhadap `row_hash` baris
+sebelumnya), yang tetap mendeteksi penyisipan dan penghapusan baris, dan
+melaporkan jumlahnya **terpisah** agar tidak pernah terbaca sebagai baris yang
+terverifikasi. Yang tidak terdeteksi pada baris v1 adalah perubahan medan di
+tempat — yang pada baris v1 memang **tidak pernah** terdeteksi: untuk `changes`
+karena kolomnya tidak ikut di-hash, untuk `context` karena alarmnya berbunyi
+atas data jujur sehingga tidak dapat dipercaya. Jaminan yang hilang karena
+keputusan ini: tidak ada. Jaminan yang didapat baris baru: keduanya.
+
+Hal itu dapat diterima **hanya karena sistem ini belum pernah berjalan di
+desa** (milestone M5 "Siap UAT"): seluruh baris v1 adalah data pengembangan dan
+demo. Bila entri ini dibaca setelah sistem berjalan, keputusannya **tidak**
+berlaku lagi untuk perubahan rumus berikutnya — pemotongan rantai pada data
+produksi menuntut titik potong yang ditandatangani, dan itu keputusan lain.
+
+*Mengapa bawaan kolomnya 1 dan bukan 2:* baris yang sudah ada mendapat 1 tanpa
+satu pernyataan UPDATE pun, dan baris baru yang disisipkan sesuatu yang tidak
+mengenal kolom ini (penyisipan massal lewat `DB::table()`) juga mendapat 1 —
+jawaban yang benar, karena penyisip yang tidak tahu tentang versi hash hampir
+pasti juga tidak memakai rumus yang berlaku sekarang. Bawaan 2 akan membuat
+baris semacam itu **mengaku** v2 lalu gagal verifikasi.
+
+**4. Satu baris mutex (`audit_chain_lock`) diambil SEBELUM ujung rantai
+dibaca** — ini jawaban atas cacat (3), dan ia bukan salah satu dari tiga arah
+yang direkomendasikan laporan uji beban.
+
+Kunci baris pada pencarian kesetaraan kunci primer tidak mengambil gap lock apa
+pun, sehingga dua penulisan audit tidak lagi dapat saling menunggu: yang kedua
+hanya **menunggu** yang pertama selesai. Deadlock (dibatalkan) menjadi lock
+wait (ditunggu). `FOR UPDATE` pada pembacaan ujung rantai **tetap ada**, kini
+tidak pernah diperebutkan, karena ia yang memastikan ujung rantai dibaca dalam
+versi terbaru dan bukan dari snapshot REPEATABLE READ transaksi pemanggil —
+yang dapat lebih tua daripada baris yang baru saja di-commit permintaan lain.
+
+Dibuktikan langsung, enam proses bersamaan dengan jendela diperlebar: **5 dari
+6 gagal dengan 1213** tanpa baris mutex, **6 dari 6 berhasil** dengannya.
+
+*Mengapa bukan ketiga arah yang direkomendasikan laporan:*
+
+- **Percobaan ulang `DB::transaction($cb, 3)` pada layanan penulis** ditolak
+  karena ia mengobati gejala di 32 tempat, bukan sebabnya di satu tempat. Ada
+  32 pemanggilan `DB::transaction` di 13 layanan; setiap satunya menuntut bukti
+  idempotensi sendiri, dan penulis layanan **berikutnya** tidak akan tahu bahwa
+  ia harus menambahkannya. Cacat yang penangkalnya harus diingat di tiap tempat
+  baru adalah cacat yang akan kembali.
+- **Middleware yang mengulang permintaan tulis** ditolak karena efek di luar
+  transaksi — notifikasi, berkas PDF, surel — akan terulang bersamanya.
+- **Melepas rantai ke pekerjaan latar belakang** ditolak karena ia memindahkan
+  jaminan keutuhan dari "saat ditulis" ke "beberapa saat kemudian", yaitu
+  mengubah sifat buktinya untuk memperbaiki kinerja yang belum menjadi sumbat.
+
+Percobaan ulang di tingkat transaksi terluar **tidak menjadi salah** karenanya;
+ia hanya tidak lagi diperlukan untuk sebab ini, dan tetap menjadi langkah
+berikutnya bila 40001 muncul dari tabel lain.
+
+*Yang SENGAJA tidak dilakukan:* tabel mutex itu **tidak** menyimpan hash ujung
+rantai. Menyimpannya akan membuat dua sumber kebenaran untuk pertanyaan "baris
+terakhir apa", dan sumber kedua itu akan basi setiap kali ada yang menyisipkan
+ke `audit_logs` tanpa melewati `AuditLogger` — yang dilakukan penyemai volume.
+Ujung rantai tetap dibaca dari `audit_logs`.
+
+**5. `verifyChain()` memakai `lazyById()` dan baris mentah.** Perbedaan
+`lazy()` dan `lazyById()` berupa satu kata, keduanya tampak sama di layar, dan
+keduanya benar — hanya salah satunya yang masih benar pada satu juta baris.
+Hash dihitung dari baris mentah, sehingga 1,5 juta objek Eloquent beserta cast
+JSON dua kolomnya tidak perlu dibuat.
+
+### Konsekuensi yang diterima
+
+1. **Satu titik serialisasi global tetap ada** dan kini eksplisit: setiap
+   penulisan yang diaudit menunggu pada satu baris yang sama, dan karena
+   `AuditLogger` hampir selalu berjalan di dalam transaksi pemanggil, mutex-nya
+   dilepas saat transaksi **terluar** commit. Itu sudah begitu sebelum entri
+   ini; yang berubah hanyalah bahwa ia dapat dibaca dari kodenya. Konsekuensi
+   yang menuntut kepatuhan: **baris audit dicatat SETELAH penulisan datanya,
+   tidak sebelum.** Layanan yang mengunci baris data sesudah memanggil pencatat
+   mengembalikan kemungkinan deadlock lewat pintu lain — kali ini antara mutex
+   dan tabel datanya.
+2. **`sid:verify-audit-chain` kini melaporkan dua angka**, dan yang kedua
+   berupa peringatan. Pada basis data mana pun yang berisi baris sebelum entri
+   ini, peringatan itu akan selalu muncul. Itu disengaja: ia menyebutkan dengan
+   tepat apa yang sedang dan tidak sedang dijamin.
+3. **`VolumeSeeder::chainHash()` wajib mengikuti rumus baru**, termasuk
+   mengurutkan kuncinya dan mengisi `hash_version = 2`. Penyemai yang tertinggal
+   akan membuat `sid:verify-audit-chain` melaporkan rantai rusak atas data yang
+   ia sendiri buat.
+4. **Satu tabel satu kolom satu baris** (`audit_chain_lock`) yang tidak
+   menyimpan apa pun akan terlihat seperti sisa yang terlupakan bagi siapa pun
+   yang tidak membaca entri ini. Karena itu alasannya ditulis panjang di
+   migrasinya dan di `AuditLogger::append()`, dan dijaga uji
+   `AuditChainConcurrencyTest`.
+
+### Dijaga uji
+
+- `tests/Feature/AuditLogTest::perubahan_kolom_changes_terdeteksi` — mengubah
+  kolom `changes` satu baris langsung di basis data lalu menuntut verifikasi
+  **gagal**. Sebelum entri ini, uji ini lulus padahal seharusnya gagal.
+- `tests/Feature/AuditLogTest::urutan_kunci_json_tidak_merusak_rantai` — sisi
+  sebaliknya: baris yang kuncinya diurutkan ulang MySQL **tidak** boleh
+  dilaporkan rusak.
+- `tests/Feature/Audit/AuditChainConcurrencyTest` — dua belas pencatatan
+  bersamaan di proses terpisah semuanya berhasil dan rantainya tetap satu; dan
+  pembuktian bahwa baris mutex-lah yang menghapus 1213.

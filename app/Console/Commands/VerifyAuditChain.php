@@ -45,6 +45,25 @@ final class VerifyAuditChain extends Command
 
         $this->components->info("Rantai utuh. {$result['checked']} baris diperiksa.");
 
+        /*
+         * Baris rumus lama DISEBUTKAN, tidak dibiarkan menyatu ke dalam
+         * "baris diperiksa" — lihat keterangan AuditLogger::verifyChain().
+         * Yang terperiksa pada baris v1 hanyalah sambungannya; perubahan
+         * medan di tempat pada baris v1 tidak akan pernah terdeteksi, dan
+         * laporan yang tidak menyebutkannya akan terbaca lebih meyakinkan
+         * daripada yang sebenarnya dijamin.
+         */
+        if ($result['unverifiable'] > 0) {
+            $this->newLine();
+            $this->components->warn(sprintf(
+                '%d baris memakai rumus hash v1 (sebelum KEP-020): hanya '
+                .'SAMBUNGANNYA yang diperiksa, bukan isinya.',
+                $result['unverifiable'],
+            ));
+            $this->line('Penyisipan & penghapusan baris tetap terdeteksi; perubahan');
+            $this->line('medan di tempat pada baris-baris itu tidak. Lihat KEP-020.');
+        }
+
         if ($this->option('check-grants')) {
             return $this->checkGrants();
         }
