@@ -48,7 +48,7 @@ final class ReportService
          * seluruh tabel penduduk — ± 385 ms pada 20.000 penduduk, cukup
          * sendirian untuk membuat halaman ini melewati NFR-PERF-01
          * (p95 baca ≤ 500 ms). Lihat ResidentRepository::recapByCategories()
-         * dan docs/22-uji-beban-sprint-7.md §7.
+         * dan docs/23-uji-beban-sprint-7.md §7.
          */
         $recap = $this->residents->recapByCategories([
             'gender', 'religion_code', 'education_code',

@@ -788,7 +788,7 @@ pertanyaan itu sendiri adalah bentuk pembukaan keanoniman.
 **Tanggal:** 2026-10-24 · **Status:** Wajib · **Kategori:** kinerja, model data
 
 **Masalah yang ditemukan:** uji beban & volume Sprint 7
-(`docs/22-uji-beban-sprint-7.md`) menyemai 20.000 penduduk — volume sasaran
+(`docs/23-uji-beban-sprint-7.md`) menyemai 20.000 penduduk — volume sasaran
 resmi proyek (NFR-PERF-07) — lalu mengukur setiap halaman. Satu halaman
 melewati NFR-PERF-01 (p95 baca ≤ 500 ms) **sendirian**:
 `ReportService::population()` terukur **755 ms**.

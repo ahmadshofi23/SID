@@ -676,7 +676,7 @@ final class VolumeSeeder extends Seeder
              * Penyemai WAJIB mengikuti apa yang dilakukan computeHash(), bukan
              * apa yang seharusnya dilakukannya, karena verifikasinya memakai
              * computeHash() yang sama. Akibatnya yang jauh lebih penting
-             * dicatat sebagai temuan di docs/22-uji-beban-sprint-7.md §7:
+             * dicatat sebagai temuan di docs/23-uji-beban-sprint-7.md §7:
              * kolom `changes` tidak pernah masuk ke rantai hash, sehingga
              * nilai lama/baru data penduduk dapat diubah di luar aplikasi
              * tanpa merusak rantai. Memperbaikinya membatalkan hash SELURUH

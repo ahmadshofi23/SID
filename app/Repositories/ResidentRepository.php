@@ -519,7 +519,7 @@ final class ResidentRepository extends GuardedRepository
          * penduduk aktif lalu menghitungnya di PHP. Pada 20.000 penduduk itu
          * terukur 370 ms — 81 ms di antaranya SQL dan ± 290 ms sisanya
          * membangun 20.000 objek Eloquent yang seluruhnya dibuang setelah
-         * ditambahkan ke tiga penghitung (uji beban Sprint 7, docs/22 §7).
+         * ditambahkan ke tiga penghitung (uji beban Sprint 7, docs/23 §7).
          * Dikelompokkan basis data, hasilnya ± 24 baris (jumlah wilayah ×
          * dua jenis kelamin) dan terukur di bawah 10 ms.
          *
@@ -611,7 +611,7 @@ final class ResidentRepository extends GuardedRepository
      * setiap kueri harus MEMBACA ULANG seluruh baris penduduk: indeks
      * `idx_residents_status` hanya memuat (status, deleted_at), sehingga
      * kolom kategorinya diambil satu per satu dari indeks berkluster. Lima
-     * kali pembacaan yang sama = ± 385 ms (uji beban Sprint 7, docs/22 §7).
+     * kali pembacaan yang sama = ± 385 ms (uji beban Sprint 7, docs/23 §7).
      *
      * Dikelompokkan sekali menurut KOMBINASI kelima kolom, pembacaannya
      * tinggal satu dan hasilnya ± 90 ms. Jumlah baris yang kembali adalah

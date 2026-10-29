@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  * (status, deleted_at, region_id, gender, religion_code, education_code,
  *  occupation_code, marital_status_code).
  *
- * MENGAPA, DENGAN ANGKA (uji beban Sprint 7, docs/22-uji-beban-sprint-7.md §7)
+ * MENGAPA, DENGAN ANGKA (uji beban Sprint 7, docs/23-uji-beban-sprint-7.md §7)
  * --------------------------------------------------------------------------
  * Halaman Laporan menampilkan rekap penduduk per wilayah dan per lima
  * kategori. Seluruhnya menyaring `status = 'aktif' AND deleted_at IS NULL`,

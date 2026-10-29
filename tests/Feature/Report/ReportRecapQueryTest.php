@@ -20,7 +20,7 @@ use Tests\TestCase;
 /**
  * Penjaga perbaikan kinerja rekap laporan — KEP-019, FR-LAP-03, NFR-PERF-01.
  *
- * Uji ini lahir dari uji beban Sprint 7 (docs/22-uji-beban-sprint-7.md §7).
+ * Uji ini lahir dari uji beban Sprint 7 (docs/23-uji-beban-sprint-7.md §7).
  * Pada 20.000 penduduk, `ReportService::population()` terukur 755 ms —
  * melewati NFR-PERF-01 (p95 baca ≤ 500 ms) sendirian — karena ia membaca
  * seluruh tabel penduduk ENAM kali: sekali per kategori dan sekali lagi untuk

@@ -98,7 +98,7 @@ export function masuk(identifier, password) {
    * deadlock MySQL 1213 dan VU-nya mati sebelum satu pun pengukuran dimulai.
    *
    * Jeda ini BUKAN penutup masalahnya: deadlock itu temuan nyata uji ini dan
-   * dicatat di docs/22-uji-beban-sprint-7.md §7 butir 1. Yang ditiadakan di
+   * dicatat di docs/23-uji-beban-sprint-7.md §7 butir 1. Yang ditiadakan di
    * sini hanyalah kerumunan buatan pada detik nol, yang tidak pernah terjadi
    * di desa — petugas masuk satu per satu sepanjang pagi, dan beban yang
    * hendak diukur adalah pekerjaan sesudah mereka masuk.

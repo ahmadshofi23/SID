@@ -21,7 +21,7 @@ declare(strict_types=1);
  *    satu pekerja tidak mengukur aplikasinya; ia mengukur panjang antrean.
  *
  * Server bawaan PHP tetap BUKAN php-fpm + nginx. Konsekuensinya dicatat
- * terbuka di docs/22-uji-beban-sprint-7.md §3 agar angkanya tidak dibaca
+ * terbuka di docs/23-uji-beban-sprint-7.md §3 agar angkanya tidak dibaca
  * sebagai angka produksi.
  *
  * CARA PAKAI — lihat tests/Load/README.md.

@@ -3,7 +3,7 @@
 Perkakas untuk kriteria non-fungsional di
 [`docs/09-testing-qa.md` §4.5](../../docs/09-testing-qa.md) dan NFR-PERF di
 [`docs/03-srs.md` §5.1](../../docs/03-srs.md). Hasil pengukuran yang sudah
-dijalankan ada di [`docs/22-uji-beban-sprint-7.md`](../../docs/22-uji-beban-sprint-7.md).
+dijalankan ada di [`docs/23-uji-beban-sprint-7.md`](../../docs/23-uji-beban-sprint-7.md).
 
 | Berkas | Gunanya |
 |---|---|
@@ -97,12 +97,12 @@ dihapus tanpa sadar:
   Sebabnya: setiap permintaan pada server bawaan PHP membangun ULANG seluruh
   keadaan aplikasi, sehingga ± 1 detik waktu pekerja dihabiskan untuk kerja
   yang sebenarnya di bawah 100 ms. Pekerja yang lebih banyak menutupi sebagian
-  biaya itu; php-fpm menghapusnya. Lihat docs/22 §6.1.
+  biaya itu; php-fpm menghapusnya. Lihat docs/23 §6.1.
 - **`CACHE_STORE=array`** — **mematikan pembatas laju per IP**, dan ini
   disengaja. (Ia juga, berlawanan dengan dugaan, lebih CEPAT daripada
   `redis` di server uji ini: predis membuka sambungan baru pada setiap
   permintaan, sementara php-fpm menyimpannya lintas permintaan. Terukur 87,4
-  vs 38,2 permintaan/detik — docs/22 §6.2.) `throttle:20,1` pada login dan `throttle:5,60` pada pengiriman
+  vs 38,2 permintaan/detik — docs/23 §6.2.) `throttle:20,1` pada login dan `throttle:5,60` pada pengiriman
   pengaduan dihitung **per alamat IP**. k6 menekan dari satu host, sehingga 50
   pengguna tiruan tampak sebagai satu alamat IP dan ditolak 429 — bukan karena
   aplikasinya lambat, melainkan karena pembatasnya bekerja dengan benar.
@@ -121,7 +121,7 @@ dihapus tanpa sadar:
   kompilasi PHP, bukan kecepatan aplikasi. Produksi selalu memakai opcache.
 
 Server bawaan PHP **bukan** php-fpm + nginx, dan angkanya tidak boleh dibaca
-sebagai angka produksi. Lihat `docs/22-uji-beban-sprint-7.md` §3.
+sebagai angka produksi. Lihat `docs/23-uji-beban-sprint-7.md` §3.
 
 ---
 
