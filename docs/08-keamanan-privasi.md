@@ -203,6 +203,34 @@ Permissions-Policy: geolocation=(self), camera=(self), microphone=()
 metode, path (tanpa data sensitif), status, durasi, IP, *user agent*.
 **Retensi log:** aplikasi 90 hari; audit log 5 tahun.
 
+### Verifikasi rantai hash audit log
+
+`php artisan sid:verify-audit-chain` — **mingguan di luar jam kerja**, dan
+tidak pernah dipasang sinkron di jalur permintaan mana pun. Perintah ini
+membaca seluruh tabel; pada 1,5 juta baris ia memakan belasan detik (ADR-005,
+KEP-020 §butir 5).
+
+Keluarannya punya **tiga** kemungkinan, bukan dua, dan perbedaannya penting:
+
+| Yang tampil di layar | Artinya | Tindakan |
+|---|---|---|
+| `Rantai utuh. N baris diperiksa.` | Setiap baris dihitung ulang dan cocok | — |
+| …diikuti `WARN: N baris memakai rumus hash v1` | Sejumlah baris **v1**: hanya SAMBUNGANNYA yang diperiksa | Catat angkanya; ia hanya boleh **mengecil** seiring pengarsipan |
+| `RANTAI RUSAK pada baris id=N` | Baris N tidak cocok dengan hash yang tersimpan | **Sev-1** — lihat §9 |
+
+**Mengapa ada baris yang hanya diperiksa sambungannya.** Rumus hash v1 (seluruh
+baris sebelum KEP-020) meng-*encode* kolom JSON menurut urutan kunci saat
+penulisan, dan urutan itu **hilang** ketika MySQL menyimpannya — tidak ada cara
+mereproduksinya dari apa yang tersimpan. Baris v1 karena itu diperiksa
+sambungannya saja: `prev_hash` baris berikutnya sama dengan `row_hash` baris
+ini. Penyisipan, penghapusan, dan penyusunan ulang baris tetap terdeteksi;
+**perubahan medan di dalam satu baris v1 tidak.**
+
+Angka pada peringatan itu karena itu adalah ukuran **sisa risiko yang diwarisi**,
+dan ia harus dibaca setiap minggu. Ia tidak pernah bertambah — tidak ada baris
+v1 baru yang dapat ditulis — sehingga pertambahan apa pun berarti ada yang
+menyisipkan baris di luar aplikasi.
+
 ---
 
 ## 9. Tanggap Insiden
@@ -210,7 +238,7 @@ metode, path (tanpa data sensitif), status, durasi, IP, *user agent*.
 **Klasifikasi**
 | Tingkat | Definisi | Target respons |
 |---------|----------|----------------|
-| **Sev-1** | Dugaan kebocoran data pribadi; sistem tidak dapat diakses | Mulai ≤ 1 jam |
+| **Sev-1** | Dugaan kebocoran data pribadi; sistem tidak dapat diakses; **rantai audit log terputus** | Mulai ≤ 1 jam |
 | **Sev-2** | Kerentanan dieksploitasi tanpa bukti kebocoran; modul kritis rusak | ≤ 4 jam |
 | **Sev-3** | Kerentanan ditemukan, belum dieksploitasi | ≤ 2 hari kerja |
 | **Sev-4** | Gangguan minor | Sprint berikutnya |
@@ -226,6 +254,28 @@ metode, path (tanpa data sensitif), status, durasi, IP, *user agent*.
 4. **Pulihkan:** tutup celah, pulihkan dari cadangan bersih, paksa reset kata sandi.
 5. **Evaluasi (≤ 14 hari):** *post-mortem* tanpa menyalahkan individu; perbaikan
    masuk *backlog* dengan prioritas tertinggi.
+
+**Prosedur rantai audit log terputus (Sev-1)**
+
+Rantai yang terputus berarti salah satu dari dua hal, dan **keduanya Sev-1**:
+baris audit diubah atau dihapus langsung di basis data, atau basis data rusak.
+Audit log adalah bukti; bukti yang tidak dapat dipertanggungjawabkan tidak
+lebih baik daripada tidak ada bukti.
+
+1. **Jangan perbaiki rantainya.** Menghitung ulang `row_hash` membuat
+   rantainya utuh kembali dan **menghapus satu-satunya jejak** bahwa sesuatu
+   pernah terjadi. Aplikasi memang tidak dapat melakukannya — hak akses MySQL
+   mencabut UPDATE atas tabel ini — dan tangan manusia juga tidak boleh.
+2. **Catat id barisnya** (`broken_at`) dan ambil salinan cadangan **sebelum**
+   kerusakan, lalu bandingkan baris itu. Selisihnya adalah isi insiden.
+3. **Periksa siapa yang punya akses MySQL langsung.** Rantai hanya dapat putus
+   dari luar aplikasi, jadi daftar itulah daftar tersangkanya. Cabut yang tidak
+   perlu, lalu lanjutkan ke langkah 2–5 prosedur kebocoran di atas.
+4. **Satu kekecualian yang harus diperiksa lebih dulu**, agar tidak ada
+   insiden palsu: baris **v1** (lihat §8) hanya diperiksa sambungannya. Laporan
+   "rantai rusak" pada baris v1 berarti baris disisipkan, dihapus, atau disusun
+   ulang — bukan medannya diubah. Bila yang rusak adalah baris v2, medannya
+   memang berubah.
 
 **Kontak (wajib diisi sebelum go-live):**
 | Peran | Nama | Kontak |

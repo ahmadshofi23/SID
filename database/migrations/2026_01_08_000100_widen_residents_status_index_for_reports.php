@@ -52,9 +52,8 @@ use Illuminate\Support\Facades\Schema;
  * penulisan yang tidak ada yang menungguinya dengan pembacaan yang
  * ditunggui.
  *
- * KONSEKUENSI DOKUMEN: docs/05-model-data.md §3.2 masih menuliskan indeks
- * yang lama. Sampai dokumen itu diselaraskan, KEP-019 adalah sumber
- * kebenarannya.
+ * DOKUMEN: docs/05-model-data.md §3.2 sudah diselaraskan dengan indeks ini,
+ * beserta alasan dan angkanya.
  */
 return new class extends Migration
 {

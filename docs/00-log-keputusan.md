@@ -770,10 +770,11 @@ dan andalkan middleware `throttle` saja; (f) simpan sidik jari ber-kunci.
    dan tidak ada satu angka pun di layar yang menjadi salah karenanya. Pola
    yang sama dengan penjadwalan terbit konten portal (Sprint 6).
 
-**Konsekuensi yang diterima:** docs/05 §3.5 tidak lagi menggambarkan tabel
-`complaints` secara persis — dua kolomnya berbeda. Dokumen model data harus
-diperbarui pada penyelarasan berikutnya; sampai itu terjadi, entri ini adalah
-sumber kebenarannya. Satu kolom tambahan juga berarti satu indeks tambahan
+**Konsekuensi yang diterima:** docs/05 §3.5 **sudah diselaraskan**
+(2026-10-29): DDL-nya menuliskan `triage_due_at` dan `submitted_ip_hash`
+beserta `idx_complaints_triage_due`, dan alasan keduanya ikut pindah ke sana —
+dokumen model data kembali menjadi sumber kebenaran skema. Satu kolom tambahan
+juga berarti satu indeks tambahan
 (`idx_complaints_triage_due`), yang dibayar pada setiap penyisipan pengaduan —
 jumlah yang kecil dibanding nilai angka ketepatan triase.
 
@@ -875,8 +876,9 @@ selisih itu pada saat yang paling buruk — di rapat.
 2. **Impor massal menjadi sedikit lebih lambat.** Impor 20.000 baris
    memperbarui satu indeks yang lebih lebar. Pada penyemai volume, selisihnya
    tidak terukur di atas derau.
-3. **docs/05-model-data.md §3.2 masih menuliskan indeks yang lama.** Sampai
-   dokumen itu diselaraskan, entri ini adalah sumber kebenarannya.
+3. **docs/05-model-data.md §3.2 sudah diselaraskan** (2026-10-29): DDL-nya
+   menuliskan kedelapan kolom, beserta angka sebelum/sesudah dan alasan indeks
+   terpisah ditolak. Dokumen itu kembali menjadi sumber kebenaran skema.
 4. **Daftar putih kolom rekap kini dipakai di dua tempat** (satu kolom dan
    beberapa kolom). Nama kolom tidak dapat diikat sebagai parameter SQL, jadi
    daftar putih itu satu-satunya yang memisahkan laporan dari injeksi SQL;
@@ -1095,3 +1097,132 @@ JSON dua kolomnya tidak perlu dibuat.
   bersamaan di proses terpisah semuanya berhasil dan rantainya tetap satu; dan
   pembuktian bahwa baris mutex-lah yang menghapus 1213.
 
+
+---
+
+## KEP-021 — Log Aktivitas: urutan yang menentukan segalanya, dan penyamaran IP yang ditolak
+**Tanggal:** 2026-10-29 · **Status:** Wajib · **Kategori:** privasi, kinerja, bukti
+
+**Masalah yang ditemukan.** FR-ADM-05 ("Pencarian & ekspor audit log", prioritas
+**M**) belum pernah dikerjakan: `pengaturan/log-aktivitas` adalah sebuah closure
+yang merender `Placeholder`. Ia tidak tercatat di "Yang Belum Dikerjakan"
+docs/21 §6 maupun ditunda dengan alasan seperti FR-LAP-08 — ia sekadar lewat.
+Akibatnya seluruh pekerjaan yang menjaga keutuhan rantai hash (ADR-005,
+KEP-020) melindungi catatan yang hanya dapat dibaca lewat MySQL, dan kendali
+A09 docs/08 §4 bersandar pada orang yang bersedia membuka basis data.
+
+Membangunnya memunculkan tiga keputusan yang tidak dapat dibuat tanpa
+menuliskan alasannya.
+
+### 1. Alamat IP ditampilkan apa adanya — dan mengapa penyamaran DITOLAK
+
+Kekhawatiran yang wajar muncul lebih dulu, dan ia sempat dibangun sebelum
+diperiksa. KEP-018 menyimpan alamat IP pelapor pengaduan sebagai
+`submitted_ip_hash`, bukan alamat mentah, justru karena **alamat mentah dapat
+di-JOIN dengan audit log** untuk menunjuk pelapor anonim (RULE-09). Halaman
+Log Aktivitas tampaknya membuka kembali tautan itu dari arah sebaliknya:
+alamat di layar, di sebelah baris `complaint.created_anonymous`, tinggal
+dicocokkan dengan baris `auth.login` pada menit yang sama — dua kali
+menyaring, tanpa satu pun hak istimewa tambahan.
+
+**Tautan itu tidak ada.** `AuditLogger::logWithoutActor()` tidak mengisi
+`ip_address` sama sekali, dan keterangannya menyebutkan alasan yang persis
+sama. Ia ditutup pada PENULISANNYA — satu-satunya tempat yang menutupnya
+untuk semua pembaca sekaligus, termasuk yang membuka MySQL langsung.
+Diperiksa pada basis data pengembangan: satu-satunya baris tanpa pelaku yang
+juga tanpa alamat adalah `complaint.created_anonymous`.
+
+**Keputusan: tidak ada penyamaran, dan alasan menolaknya adalah yang kedua.**
+Penyamaran "untuk setiap baris tanpa pelaku" tidak menambah perlindungan apa
+pun — dan merusak sesuatu. Baris tanpa pelaku yang MEMANG membawa alamat
+adalah tindakan publik: pada basis data yang sama terdapat `letter.tracked`,
+`letter.tracking_failed`, dan `citizen.registered`, ditambah percobaan masuk
+yang gagal. Alamat pada baris-baris itu adalah satu-satunya petunjuk ketika
+seseorang mencoba menebak kode pelacakan ribuan kali. Menyamarkannya berarti
+membutakan pemantauan penyalahgunaan demi keamanan yang sudah diperoleh di
+tempat lain — mahal, dan tanpa imbalan.
+
+Yang dipasang sebagai gantinya adalah **uji atas invariannya**, bukan lapis
+penyamaran: `AuditLogPageTest::baris_tanpa_pelaku_tidak_pernah_membawa_alamat_ip`
+menuntut `logWithoutActor()` tidak menyimpan `ip_address` maupun `user_agent`.
+Ia diletakkan di berkas uji halaman ini — bukan hanya di uji `AuditLogger` —
+karena halaman inilah yang mengubah akibat bila invariannya patah: sebelum ia
+ada, satu alamat yang lolos hanya terbaca oleh orang yang membuka MySQL.
+Sisi sebaliknya dijaga `alamat_ip_tindakan_publik_tetap_utuh`, yang akan gagal
+bila seseorang memasang penyamaran itu kembali.
+
+**Batas yang tetap harus dikatakan:** pada baris BERPELAKU, alamat mentah
+memang ada dan memang tampil. Ia tidak menyentuh RULE-09 — pelakunya sudah
+bernama di baris yang sama — dan ia adalah alasan kolom itu dicatat sejak
+awal: menelusuri dari mana sebuah tindakan datang.
+
+### 2. `ORDER BY created_at DESC, id DESC`, bukan `ORDER BY id DESC`
+
+`id` adalah urutan penyisipan, jadi mengurutkan menurutnya tampak paling
+wajar — dan ia **melumpuhkan setiap indeks pada tabel ini**. Semua indeks
+`audit_logs` berujung pada `created_at` (`idx_audit_action`, `idx_audit_actor`,
+`idx_audit_entity`) atau terdiri darinya (`idx_audit_created`); mengurutkan
+menurut `id` memaksa MySQL memindai kunci primer dari ujung dan MENYARING,
+bukan mencari. Terukur pada `sid_desa_volume` (1.500.081 baris):
+
+| kueri | `ORDER BY id DESC` | `ORDER BY created_at DESC, id DESC` |
+|---|---|---|
+| saringan rentang tanggal | 241,4 ms | 0,6 ms |
+| saringan aksi + rentang tanggal | 211,1 ms | 0,6 ms |
+| tanpa saringan | 0,4 ms | 0,7 ms |
+
+Empat ratus kali, dan sebabnya tidak terlihat sama sekali dari kodenya — satu
+kata yang berbeda. Baris terakhir tabel itu menjelaskan mengapa cacat ini dapat
+hidup lama tanpa ditemukan: tanpa saringan, keduanya sama cepat.
+
+`id` tetap ikut sebagai **pemutus seri**, dan itu bukan kehati-hatian
+berlebihan. `created_at` berpresisi milidetik, dan impor massal menulis
+puluhan baris dalam satu milidetik yang sama. Diukur dengan 52 baris
+berwaktu identik: kursor tanpa pemutus seri menampilkan **50 baris dari 52** —
+dua baris hilang sama sekali dari pandangan pemeriksa, tanpa satu pun pesan
+galat. Dijaga `AuditLogPageTest::kursor_tidak_melompati_baris_berwaktu_sama`.
+
+### 3. Tidak ada saringan teks bebas, dan pelaku dipilih dari daftar
+
+`WHERE actor_name LIKE '%…%'` tidak dapat memakai indeks apa pun: terukur
+5,6 ms bila kebetulan ada yang cocok di dekat ujung tabel, dan **839,4 ms**
+bila tidak ada yang cocok sama sekali — yaitu tepat pada pencarian yang salah
+ketik, yang paling sering dilakukan orang. Halaman yang menggantung hampir
+satu detik justru ketika penggunanya keliru adalah halaman yang mengajari
+orang untuk tidak memakainya.
+
+Daftar pelaku untuk saringan itu menyimpan jebakannya sendiri:
+`SELECT DISTINCT actor_id, actor_name` memindai seluruh tabel — **654 ms**
+untuk menghasilkan sembilan baris — karena `idx_audit_actor` memuat
+`(actor_id, created_at)` saja. `SELECT DISTINCT actor_id` atas indeks yang
+sama: **3,0 ms**, dan namanya diambil dari `users` dalam satu kueri.
+
+Pelaku yang **akunnya sudah dihapus** tidak ada di `users`, dan ia justru yang
+dicari pemeriksa yang menelusuri jejak pejabat yang sudah diberhentikan. Nama
+untuk id semacam itu dibaca dari audit log sendiri — satu pencarian berindeks
+per id — karena `actor_name` di sana memang disimpan denormal tepat untuk
+alasan ini, dan ditandai "(akun dihapus)" di layar.
+
+### Konsekuensi yang diterima
+
+1. **Halaman tidak menampilkan jumlah total baris.** `paginate()` memanggil
+   `COUNT(*)` atas seluruh tabel pada setiap pembukaan: ± 95 ms yang tidak
+   dapat dipercepat (docs/23 §7 butir 4), dibayar untuk angka yang tidak
+   dibutuhkan siapa pun. Yang ditampilkan adalah jumlah baris di halaman itu,
+   dan tidak ada tempat di layar yang menjanjikan sebaliknya. Dijaga
+   `AuditLogPageTest::halaman_tidak_menghitung_seluruh_tabel`, yang memeriksa
+   kueri yang benar-benar dijalankan — bukan membaca kodenya.
+2. **`COUNT(*)` tetap dibayar sekali pada ekspor**, karena baris audit yang
+   mencatat ekspor tanpa menyebut jumlah barisnya tidak dapat menjawab
+   satu-satunya pertanyaan yang penting setelah data meninggalkan sistem.
+3. **Ekspor audit log ikut tercatat di audit log.** Akibat yang disengaja:
+   baris `data.exported` itu tidak ada di dalam berkas yang baru diunduh, jadi
+   dua ekspor berurutan tidak menghasilkan berkas yang sama persis.
+4. **`audit.ekspor` adalah izin tersendiri**, dan hanya Admin Desa
+   memegangnya — RoleSeeder memberi Kepala Desa dan Pengawas `audit.lihat`
+   saja. Membaca di layar meninggalkan pembacanya di dalam sistem; berkas CSV
+   keluar dan tidak dapat ditarik kembali. FR-ADM-05 memang membatasi ekspor
+   pada AD/SA.
+5. **Tidak ada lingkup wilayah.** Audit yang disaring menurut wilayah
+   pembacanya tidak bernilai sebagai bukti, sehingga `audit_logs` tetap di
+   luar lapis repository KEP-002 — lihat keterangan `AuditLogReader`.

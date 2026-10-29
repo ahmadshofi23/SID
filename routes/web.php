@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
@@ -593,8 +594,16 @@ Route::middleware('auth')->group(function (): void {
             ->middleware('izin:jenis_surat.kelola')->name('jenis-surat.toggle');
     });
 
-    Route::get('pengaturan/log-aktivitas', fn () => Inertia::render('Placeholder', [
-        'title' => 'Log Aktivitas',
-        'sprint' => 'Sprint 7',
-    ]))->middleware('izin:audit.lihat')->name('audit.index');
+    /*
+     * Log Aktivitas — FR-ADM-05.
+     *
+     * Rute ekspor didaftarkan dengan izin SENDIRI (`audit.ekspor`), bukan
+     * dengan `audit.lihat` yang sama: membaca di layar meninggalkan pembacanya
+     * di dalam sistem, sedangkan berkas CSV keluar dari sistem dan tidak dapat
+     * ditarik kembali. Kepala Desa dan Pengawas memegang yang pertama saja.
+     */
+    Route::get('pengaturan/log-aktivitas', [AuditLogController::class, 'index'])
+        ->middleware('izin:audit.lihat')->name('audit.index');
+    Route::get('pengaturan/log-aktivitas/ekspor', [AuditLogController::class, 'export'])
+        ->middleware('izin:audit.ekspor')->name('audit.export');
 });

@@ -618,7 +618,7 @@ tidak ada hidrasi baris, daftar putih kolom, dan **susunan kolom indeksnya**).
 
 ---
 
-### Temuan 4 — `COUNT(*)` paginator adalah satu-satunya kueri audit log yang mahal
+### Temuan 4 — `COUNT(*)` paginator adalah satu-satunya kueri audit log yang mahal *(DIPERBAIKI sesudahnya — KEP-021)*
 
 **Apa yang terjadi.** Seluruh kueri `audit_logs` yang tersaring selesai di
 bawah 1 ms pada 1,5 juta baris. Satu-satunya yang mahal adalah `COUNT(*)`
@@ -638,6 +638,32 @@ atas ke bawah; nomor halaman dan jumlah total baris tidak pernah dibutuhkan
 siapa pun di sana, dan keduanya adalah satu-satunya alasan `COUNT(*)` ada.
 Bila jumlah total benar-benar diminta, ia dapat ditampilkan sebagai angka yang
 di-cache harian, bukan dihitung ulang per pembukaan.
+
+**Cara ini ditutup (KEP-021).** Halaman `pengaturan/log-aktivitas` dibangun —
+FR-ADM-05, yang ternyata belum pernah dikerjakan dan tidak tercatat sebagai
+ditunda di mana pun — dengan `cursorPaginate()` sesuai rekomendasi di atas.
+Jumlah total memang tidak ditampilkan, dan tidak ada tempat di layar yang
+menjanjikan sebaliknya; yang tampil adalah jumlah baris di halaman itu.
+Larangannya dijaga uji yang memeriksa kueri yang BENAR-BENAR dijalankan
+(`AuditLogPageTest::halaman_tidak_menghitung_seluruh_tabel`), bukan dengan
+membaca kodenya — `paginate()` mudah sekali masuk kembali lewat satu perubahan
+yang tampak tidak berbahaya, dan 95 ms itu tidak akan terlihat di basis data
+pengembangan yang kecil. `COUNT(*)` tetap dibayar **sekali pada ekspor**,
+karena baris audit yang mencatat ekspor tanpa menyebut jumlah barisnya tidak
+dapat menjawab pertanyaan "seberapa banyak yang keluar".
+
+**Dan satu hal yang lebih mahal dari `COUNT(*)` ditemukan saat membangunnya,
+yang tidak terlihat dari pengukuran laporan ini.** Mengurutkan daftar menurut
+`id DESC` — bentuk yang paling wajar ditulis, karena `id` memang urutan
+penyisipan — MELUMPUHKAN setiap indeks pada tabel ini, sebab semuanya berujung
+pada `created_at`. Terukur pada `sid_desa_volume`: saringan rentang tanggal
+**241,4 ms** dengan `ORDER BY id DESC` melawan **0,6 ms** dengan
+`ORDER BY created_at DESC, id DESC`; saringan aksi + rentang 211,1 ms melawan
+0,6 ms. Tanpa saringan keduanya sama cepat (0,4 melawan 0,7 ms), dan itulah
+sebabnya cacat semacam ini dapat hidup lama tanpa ditemukan. Keterangan
+lengkapnya, termasuk mengapa `id` tetap ikut sebagai pemutus seri dan apa yang
+terjadi tanpanya (dua dari 52 baris berwaktu identik hilang dari layar),
+ada di KEP-021.
 
 ---
 
