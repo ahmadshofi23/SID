@@ -28,22 +28,38 @@
                 @foreach ($layanan as $jenis)
                     <li>
                         <a href="{{ route('portal.layanan.detail', $jenis->code) }}"
-                           class="card flex items-start gap-4 p-5 transition-colors hover:bg-surface-hover">
+                           class="card card-lift group flex items-start gap-4 p-5 hover:bg-surface-hover">
+                            <span class="icon-chip">
+                                <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/>
+                                    <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                </svg>
+                            </span>
+
                             <div class="min-w-0 flex-1">
-                                <p class="font-medium">{{ $jenis->name }}</p>
+                                <p class="font-medium group-hover:underline">{{ $jenis->name }}</p>
                                 @if (filled($jenis->description))
-                                    <p class="mt-1 text-sm text-content-secondary">{{ $jenis->description }}</p>
+                                    <p class="mt-1 text-sm leading-relaxed text-content-secondary">{{ $jenis->description }}</p>
                                 @endif
                                 <p class="mt-2 text-xs text-content-tertiary">
                                     {{ count($jenis->requirements) }} syarat dokumen
                                 </p>
                             </div>
 
-                            <div class="shrink-0 text-right">
-                                <p class="tabular text-sm font-medium">{{ $jenis->sla_days }} hari kerja</p>
-                                <p class="mt-1 text-sm {{ (float) $jenis->fee > 0 ? 'text-content-secondary' : 'text-success' }}">
+                            <div class="flex shrink-0 flex-col items-end gap-1.5">
+                                <span class="tabular inline-flex items-center gap-1 text-sm text-content-secondary">
+                                    <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                                    </svg>
+                                    {{ $jenis->sla_days }} hari kerja
+                                </span>
+                                <span class="rounded-md px-2 py-0.5 text-xs font-medium {{ (float) $jenis->fee > 0 ? 'bg-surface-sunken text-content-secondary' : 'bg-success-soft text-success' }}">
                                     {{ (float) $jenis->fee > 0 ? 'Rp '.number_format((float) $jenis->fee, 0, ',', '.') : 'Gratis' }}
-                                </p>
+                                </span>
                             </div>
                         </a>
                     </li>

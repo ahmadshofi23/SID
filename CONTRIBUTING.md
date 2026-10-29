@@ -21,14 +21,14 @@ Akun contoh (hanya di lingkungan lokal) — kata sandi `kata-sandi-demo-2026`:
 
 | Email | Peran | 2FA | Menu yang terlihat |
 |-------|-------|-----|--------------------|
-| `admin@sukamaju.desa.id` | Admin Desa | **wajib** | Semua, termasuk **Impor** & tombol buka NIK |
-| `kades@sukamaju.desa.id` | Kepala Desa | **wajib** | Semua kecuali impor & kelola pengguna |
-| `kasi.pem@sukamaju.desa.id` | Kasi Pemerintahan | — | Kependudukan, mutasi, statistik |
-| `operator@sukamaju.desa.id` | Operator | — | Kependudukan (tanpa impor, hapus, buka NIK) |
-| `kadus.krajan@sukamaju.desa.id` | Kepala Dusun | — | **Hanya Dusun Krajan** |
-| `kadus.sido@sukamaju.desa.id` | Kepala Dusun | — | **Hanya Dusun Sidomulyo** |
-| `bpd@sukamaju.desa.id` | Pengawas | — | Read-only + ekspor |
-| `warga@sukamaju.desa.id` | Warga | — | **Hanya anggota KK-nya** |
+| `admin@teluksentosa.desa.id` | Admin Desa | **wajib** | Semua, termasuk **Impor** & tombol buka NIK |
+| `kades@teluksentosa.desa.id` | Kepala Desa | **wajib** | Semua kecuali impor & kelola pengguna |
+| `kasi.pem@teluksentosa.desa.id` | Kasi Pemerintahan | — | Kependudukan, mutasi, statistik |
+| `operator@teluksentosa.desa.id` | Operator | — | Kependudukan (tanpa impor, hapus, buka NIK) |
+| `kadus.krajan@teluksentosa.desa.id` | Kepala Dusun | — | **Hanya Dusun Krajan** |
+| `kadus.sido@teluksentosa.desa.id` | Kepala Dusun | — | **Hanya Dusun Sidomulyo** |
+| `bpd@teluksentosa.desa.id` | Pengawas | — | Read-only + ekspor |
+| `warga@teluksentosa.desa.id` | Warga | — | **Hanya anggota KK-nya** |
 
 ### Masuk sebagai Admin Desa (2FA wajib) — tanpa aplikasi autentikator
 
@@ -47,11 +47,11 @@ menghitung kode yang sama, termasuk server itu sendiri.
 sehingga rahasianya ada di basis data sejak `make fresh`. Ambil kodenya:
 
 ```bash
-php artisan sid:totp admin@sukamaju.desa.id
+php artisan sid:totp admin@teluksentosa.desa.id
 ```
 
 ```
-Akun  : admin@sukamaju.desa.id
+Akun  : admin@teluksentosa.desa.id
 Kode  : 315039
 Berlaku 19 detik lagi.
 ```

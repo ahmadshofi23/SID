@@ -67,8 +67,8 @@
                     ['RT', $angka['rt']],
                 ] as [$label, $nilai])
                     <div class="card p-4">
-                        <dt class="text-sm text-content-secondary">{{ $label }}</dt>
-                        <dd class="tabular mt-1 text-2xl font-semibold">{{ number_format($nilai, 0, ',', '.') }}</dd>
+                        <dt class="text-xs font-medium uppercase tracking-wider text-content-tertiary">{{ $label }}</dt>
+                        <dd class="tabular mt-1 text-2xl font-semibold tracking-tight">{{ number_format($nilai, 0, ',', '.') }}</dd>
                     </div>
                 @endforeach
             </dl>

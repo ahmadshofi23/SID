@@ -44,7 +44,7 @@ final class PwaTest extends TestCase
 
         $response->assertOk()
             ->assertHeader('Content-Type', 'application/manifest+json; charset=UTF-8')
-            ->assertJsonPath('name', 'Desa Sukamaju')
+            ->assertJsonPath('name', 'Desa Teluk Sentosa')
             ->assertJsonPath('start_url', '/')
             ->assertJsonPath('display', 'standalone')
             ->assertJsonPath('lang', 'id');
@@ -57,7 +57,7 @@ final class PwaTest extends TestCase
         $nama = (string) $this->get('/manifest.webmanifest')->assertOk()->json('short_name');
 
         $this->assertLessThanOrEqual(12, mb_strlen($nama),
-            'Nama di bawah ikon akan terpotong peramban menjadi "Desa Sukam…".');
+            'Nama di bawah ikon akan terpotong peramban menjadi "Desa Teluk…".');
     }
 
     #[Test]
@@ -112,7 +112,7 @@ final class PwaTest extends TestCase
          * dipakai bergantian — termasuk nama desa, yang di sini pun tidak
          * diperlukan.
          */
-        $this->assertStringNotContainsString('Sukamaju', $body,
+        $this->assertStringNotContainsString('Teluk Sentosa', $body,
             'Halaman luring memuat data dari basis data; ia tersimpan di perangkat.');
 
         // Tidak boleh terindeks: isinya tidak berguna bagi siapa pun yang mencari.

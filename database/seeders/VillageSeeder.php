@@ -21,18 +21,28 @@ final class VillageSeeder extends Seeder
     public function run(): void
     {
         VillageProfile::query()->updateOrCreate(['id' => 1], [
-            'code' => '3201012001',
-            'name' => 'Sukamaju',
-            'district' => 'Sukaraja',
-            'regency' => 'Contoh',
-            'province' => 'Jawa Barat',
-            'postal_code' => '43000',
-            'address' => 'Jl. Raya Sukamaju No. 1',
-            'phone' => '0266123456',
-            'email' => 'pemerintah@sukamaju.desa.id',
-            'website' => 'https://sukamaju.desa.id',
+            /*
+             * BELUM DIVERIFIKASI: kode Kemendagri, kode pos, nomor telepon,
+             * surel, dan domain di bawah adalah NILAI SEMENTARA. Nama desa,
+             * kecamatan, kabupaten, dan provinsi sudah sesuai; lima kolom itu
+             * harus diambil dari dokumen resmi desa dan diubah dari menu
+             * Pengaturan > Identitas Desa sebelum go-live. Kode wilayah yang
+             * salah ikut tercetak pada NOMOR SURAT (lihat seedSettings() di
+             * bawah), jadi membiarkannya berarti seluruh deret nomor surat
+             * desa salah sejak surat pertama.
+             */
+            'code' => '1210032002',
+            'name' => 'Teluk Sentosa',
+            'district' => 'Panai Hulu',
+            'regency' => 'Labuhanbatu',
+            'province' => 'Sumatera Utara',
+            'postal_code' => '21464',
+            'address' => 'Jl. Besar Teluk Sentosa No. 1',
+            'phone' => '0624000000',
+            'email' => 'pemerintah@teluksentosa.desa.id',
+            'website' => 'https://teluksentosa.desa.id',
             'timezone' => 'Asia/Jakarta',
-            'vision' => 'Terwujudnya Desa Sukamaju yang mandiri, sejahtera, dan transparan.',
+            'vision' => 'Terwujudnya Desa Teluk Sentosa yang mandiri, sejahtera, dan transparan.',
         ]);
         VillageProfile::forget();
 

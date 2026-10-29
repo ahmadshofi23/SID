@@ -79,7 +79,7 @@ final class VillageProfile extends Model
         cache()->forget('village_profile');
     }
 
-    /** "Desa Sukamaju, Kec. Sukaraja, Kab. Contoh" */
+    /** "Desa Teluk Sentosa, Kec. Panai Hulu, Kab. Labuhanbatu" */
     public function fullName(): string
     {
         return sprintf(

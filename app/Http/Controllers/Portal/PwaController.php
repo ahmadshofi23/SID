@@ -35,7 +35,7 @@ final class PwaController extends Controller
              * `short_name` adalah yang tercetak di bawah ikon pada layar
              * utama, dan ruangnya sekitar 12 karakter. Dipotong di sini
              * supaya yang terlihat warga adalah nama desanya, bukan
-             * "Desa Sukam…".
+             * "Desa Teluk…".
              */
             'short_name' => Str::limit($nama, 12, ''),
             'description' => 'Layanan administrasi dan informasi resmi Desa '.$nama.'.',

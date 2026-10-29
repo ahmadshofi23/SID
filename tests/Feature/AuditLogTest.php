@@ -149,7 +149,7 @@ final class AuditLogTest extends TestCase
             'jenis_surat' => ['old' => 'X', 'new' => 'Y'],
             'tiket' => ['old' => 1, 'new' => 2],
         ], context: [
-            'nomor_surat' => '1/SKTM/3201012001/X/2026',
+            'nomor_surat' => '1/SKTM/1210032002/X/2026',
             'jenis_surat' => 'SKTM',
             'tiket' => 'T261015-C507E9',
         ]);

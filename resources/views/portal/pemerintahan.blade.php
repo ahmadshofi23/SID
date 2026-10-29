@@ -19,7 +19,7 @@
         @else
             <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($perangkat as $orang)
-                    <li class="card flex items-start gap-4 p-5">
+                    <li class="card card-lift flex items-start gap-4 p-5">
                         @if ($orang->photo_path)
                             {{--
                               Disk `public` secara eksplisit, sama seperti logo desa
@@ -35,9 +35,9 @@
                             <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($orang->photo_path) }}"
                                  alt="Foto {{ $orang->name }}"
                                  width="64" height="64" loading="lazy" decoding="async"
-                                 class="size-16 shrink-0 rounded-full object-cover">
+                                 class="size-16 shrink-0 rounded-full object-cover ring-2 ring-accent-soft">
                         @else
-                            <span class="flex size-16 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-lg font-semibold text-content-tertiary"
+                            <span class="flex size-16 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-brand-500 to-brand-700 text-lg font-semibold text-white ring-2 ring-accent-soft"
                                   aria-hidden="true">
                                 {{ \Illuminate\Support\Str::of($orang->name)->substr(0, 1)->upper() }}
                             </span>
@@ -45,7 +45,7 @@
 
                         <div class="min-w-0">
                             <p class="font-medium">{{ $orang->name }}</p>
-                            <p class="text-sm text-content-secondary">{{ $orang->position }}</p>
+                            <p class="mt-0.5 text-sm text-accent-text">{{ $orang->position }}</p>
                             @if ($orang->region)
                                 <p class="mt-1 text-xs text-content-tertiary">Wilayah: {{ $orang->region->name }}</p>
                             @endif

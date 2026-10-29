@@ -12,7 +12,7 @@
         @else
             <div class="space-y-4">
                 @foreach ($dusun as $satuDusun)
-                    <section class="card p-5" aria-labelledby="dusun-{{ $satuDusun->id }}">
+                    <section class="card card-lift p-5" aria-labelledby="dusun-{{ $satuDusun->id }}">
                         {{-- Nama wilayah pada `regions` SUDAH memuat tingkatannya
                              ("Dusun Krajan", "RW 01", "RT 001"). Menambahkan awalan
                              di sini menghasilkan "Dusun Dusun Krajan". --}}
@@ -26,7 +26,7 @@
                         @else
                             <ul class="mt-3 grid gap-3 sm:grid-cols-2">
                                 @foreach ($satuDusun->children as $rw)
-                                    <li class="rounded-lg border border-line p-3">
+                                    <li class="rounded-lg border border-line bg-surface-sunken p-3">
                                         <p class="text-sm font-medium">{{ $rw->name }}</p>
                                         @if ($rw->children->isEmpty())
                                             <p class="mt-1 text-xs text-content-tertiary">Belum ada RT terdaftar.</p>

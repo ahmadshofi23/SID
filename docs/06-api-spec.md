@@ -8,7 +8,7 @@
 
 | Aspek | Ketentuan |
 |-------|-----------|
-| Basis URL | `https://<domain-desa>/api/v1` (mis. `https://sukamaju.desa.id/api/v1`) |
+| Basis URL | `https://<domain-desa>/api/v1` (mis. `https://teluksentosa.desa.id/api/v1`) |
 | Versi | Di dalam path (`/v1`). Perubahan yang merusak → `/v2`, `/v1` didukung ≥ 6 bulan |
 | Format | JSON (`application/json; charset=utf-8`); unggah berkas `multipart/form-data` |
 | Penamaan | Path & *query* `snake_case`, jamak (`/residents`); *field* JSON `snake_case` |

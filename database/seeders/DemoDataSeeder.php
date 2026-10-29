@@ -130,14 +130,14 @@ final class DemoDataSeeder extends Seeder
         $dusunSidomulyo = Region::query()->where('name', 'Dusun Sidomulyo')->firstOrFail();
 
         $users = [
-            ['admin@sukamaju.desa.id', 'Siti Rohmah (Sekdes)', Role::ADMIN_DESA, null, null],
-            ['kades@sukamaju.desa.id', 'Budi Santoso', Role::KEPALA_DESA, null, null],
-            ['kasi.pem@sukamaju.desa.id', 'Ahmad Fauzi', Role::KASI_PEMERINTAHAN, null, null],
-            ['operator@sukamaju.desa.id', 'Rina Operator', Role::OPERATOR, null, null],
-            ['kadus.krajan@sukamaju.desa.id', 'Sugianto (Kadus Krajan)', Role::KEPALA_DUSUN, $dusunKrajan->id, null],
-            ['kadus.sido@sukamaju.desa.id', 'Marwan (Kadus Sidomulyo)', Role::KEPALA_DUSUN, $dusunSidomulyo->id, null],
-            ['bpd@sukamaju.desa.id', 'Pengawas BPD', Role::PENGAWAS, null, null],
-            ['warga@sukamaju.desa.id', 'Ahmad Hidayat', Role::WARGA, null, $citizenResident->id],
+            ['admin@teluksentosa.desa.id', 'Siti Rohmah (Sekdes)', Role::ADMIN_DESA, null, null],
+            ['kades@teluksentosa.desa.id', 'Budi Santoso', Role::KEPALA_DESA, null, null],
+            ['kasi.pem@teluksentosa.desa.id', 'Ahmad Fauzi', Role::KASI_PEMERINTAHAN, null, null],
+            ['operator@teluksentosa.desa.id', 'Rina Operator', Role::OPERATOR, null, null],
+            ['kadus.krajan@teluksentosa.desa.id', 'Sugianto (Kadus Krajan)', Role::KEPALA_DUSUN, $dusunKrajan->id, null],
+            ['kadus.sido@teluksentosa.desa.id', 'Marwan (Kadus Sidomulyo)', Role::KEPALA_DUSUN, $dusunSidomulyo->id, null],
+            ['bpd@teluksentosa.desa.id', 'Pengawas BPD', Role::PENGAWAS, null, null],
+            ['warga@teluksentosa.desa.id', 'Ahmad Hidayat', Role::WARGA, null, $citizenResident->id],
         ];
 
         foreach ($users as [$email, $name, $roleCode, $regionId, $residentId]) {
@@ -178,7 +178,7 @@ final class DemoDataSeeder extends Seeder
      * Rahasianya dibuat acak (bukan nilai tetap yang ditulis di kode), dan
      * kodenya diperoleh dengan:
      *
-     *     php artisan sid:totp admin@sukamaju.desa.id
+     *     php artisan sid:totp admin@teluksentosa.desa.id
      *
      * Seeder ini hanya berjalan di lingkungan local & testing — lihat
      * DatabaseSeeder.

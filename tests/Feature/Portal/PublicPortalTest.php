@@ -76,7 +76,7 @@ final class PublicPortalTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk()
-            ->assertSee('Desa Sukamaju', false)
+            ->assertSee('Desa Teluk Sentosa', false)
             ->assertSee('Ajukan Surat', false);
 
         /*

@@ -211,7 +211,7 @@ final class LetterNumberingConcurrencyTest extends TestCase
         $this->type->number_pattern = '{urut:3}/{kode}/{kode_desa}/{bulan_romawi}/{tahun}';
 
         $this->assertSame(
-            '145/UJI-A/3201012001/X/2026',
+            '145/UJI-A/1210032002/X/2026',
             $service->format($this->type, 145, $issuedAt),
         );
 
@@ -220,7 +220,7 @@ final class LetterNumberingConcurrencyTest extends TestCase
         $this->type->classification_code = null;
 
         $this->assertSame(
-            '7/3201012001/2026',
+            '7/1210032002/2026',
             $service->format($this->type, 7, $issuedAt),
         );
     }

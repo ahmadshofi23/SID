@@ -99,7 +99,7 @@ export function wargaAnonim() {
 
 export function petugasBaca() {
   if (__ITER === 0) {
-    masuk('operator@sukamaju.desa.id', SANDI);
+    masuk('operator@teluksentosa.desa.id', SANDI);
   }
 
   baca('/dashboard', 'dashboard');
@@ -147,7 +147,7 @@ export function petugasTulis() {
      * Memakai operator di sini menghasilkan 403 pada setiap penulisan, dan
      * 403 yang konsisten mudah disalahartikan sebagai "penulisan cepat".
      */
-    masuk('kasi.pem@sukamaju.desa.id', SANDI);
+    masuk('kasi.pem@teluksentosa.desa.id', SANDI);
   }
 
   const id = acak(data.pengaduan_terbuka);
