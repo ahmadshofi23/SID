@@ -11,6 +11,7 @@
     <title inertia>{{ config('app.name') }}</title>
 
     @include('partials.tema')
+    @include('partials.pwa')
 
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
     @inertiaHead

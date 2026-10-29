@@ -51,6 +51,17 @@ final class HandleInertiaRequests extends Middleware
                 'user' => $user === null ? null : $this->userPayload($user),
             ],
 
+            /*
+             * Jumlah notifikasi belum dibaca untuk lonceng di setiap layar.
+             *
+             * Closure, bukan nilai: ia menjadi satu kueri COUNT pada SETIAP
+             * permintaan Inertia, dan pengguna yang belum masuk tidak perlu
+             * membayarnya sama sekali.
+             */
+            'notifikasi_belum_dibaca' => fn (): int => $user === null
+                ? 0
+                : $user->unreadNotifications()->count(),
+
             // Lazy: hanya dihitung saat benar-benar ada pesan.
             'flash' => fn (): array => [
                 'status' => $request->session()->get('status'),
@@ -73,6 +84,18 @@ final class HandleInertiaRequests extends Middleware
             'permissions' => $scope->permissions,
             'region_limited' => $scope->isRegionLimited(),
             'region_assigned' => $scope->regionPaths !== [],
+            /*
+             * Lingkupnya sesempit keluarganya sendiri — yaitu warga.
+             *
+             * Dipakai menu untuk menyembunyikan ANTREAN PETUGAS, yang sejak
+             * Sprint 7 dijaga middleware `petugas` (EnsureStaffQueue). Tanpa
+             * ini warga tetap melihat "Antrean Surat" dan "Antrean Pengaduan"
+             * di menunya — ia memang memegang `surat.lihat` dan
+             * `pengaduan.lihat` — lalu menerima 403 ketika menekannya. Menu
+             * yang menuntun ke penolakan lebih buruk daripada menu yang tidak
+             * ada: ia membuat orang menyimpulkan sistemnya rusak (KEP-012).
+             */
+            'family_limited' => $scope->isFamilyLimited(),
             'two_factor_enabled' => $user->hasTwoFactorEnabled(),
         ];
     }

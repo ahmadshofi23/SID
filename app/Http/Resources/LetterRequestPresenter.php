@@ -228,9 +228,44 @@ final class LetterRequestPresenter
      * sudah diperiksa dan kapan, bukan nama petugas yang memeriksanya;
      * halaman ini terbuka bagi siapa pun yang punya tiket + tanggal lahir,
      * dan nama petugas tidak menambah apa pun pada pelacakan status.
+     */
+    /**
+     * Muatan untuk PORTAL WARGA — pengajuan milik akun sendiri.
+     *
+     * Dibangun DI ATAS tracking(), bukan di atas detail(). Alasannya sama
+     * dengan KEP-014 §4: detail() adalah layar petugas yang akan terus
+     * bertambah isinya, dan setiap tambahan di sana tidak boleh ikut
+     * terkirim ke layar warga tanpa ada yang meninjaunya.
+     *
+     * Yang DITAMBAHKAN di atas tracking(), dan hanya itu:
+     *   - nama pemohon APA ADANYA, bukan tersamar. Halaman pelacakan publik
+     *     menyamarkannya karena pembukanya hanya memegang tiket; di sini
+     *     pembukanya sudah masuk sebagai anggota keluarga itu, dan nama
+     *     tersamar justru membuatnya tidak tahu surat ini untuk siapa.
+     *   - penanda apakah suratnya sudah dapat diunduh.
      *
      * @return array<string, mixed>
      */
+    public static function forCitizen(LetterRequest $request): array
+    {
+        $letter = $request->letter;
+
+        return [
+            ...self::tracking($request),
+            'id' => $request->id,
+            'resident_name' => $request->resident->full_name,
+            'purpose' => $request->purpose,
+            /*
+             * Hanya surat SAH yang dapat diunduh. Surat yang dibatalkan
+             * (RULE-05) tetap tercatat dan tetap terlihat statusnya, tetapi
+             * berkasnya tidak lagi beredar — salinan yang sudah dicabut
+             * tidak boleh terus dapat diambil ulang dari portal.
+             */
+            'letter_id' => $letter !== null && $letter->status === 'sah' ? $letter->id : null,
+        ];
+    }
+
+    /** @return array<string, mixed> */
     private static function trackingStep(LetterRequestLog $log): array
     {
         $labels = LetterRequest::statusLabels();

@@ -572,3 +572,526 @@ terbit; (b) tawaran tanpa status, dihitung dari ada-tidaknya mutasi;
 9. Surat yang **dibatalkan** tidak dapat lagi menjadi dasar mutasi (RULE-05):
    tanpa pagar ini, surat yang dibatalkan justru karena datanya keliru masih
    dapat dipakai mengubah status penduduk.
+
+---
+
+## KEP-016 — Portal publik dirender Blade, bukan Inertia/Vue
+**Tanggal:** 2026-10-18 · **Status:** Wajib · **Kategori:** arsitektur, kinerja
+
+**Masalah yang ditemukan:** KEP-008 memindahkan panel administrasi ke Vue 3 +
+Inertia, dan dua halaman publik yang lebih dulu ada (verifikasi keaslian surat
+dan pelacakan status) ikut dibangun dengan Inertia. Saat portal publik mulai
+dikerjakan, dua ketentuan yang selama ini belum pernah diuji menjadi mengikat
+sekaligus: `docs/07 §7` mewajibkan halaman portal **berfungsi tanpa
+JavaScript** (*progressive enhancement*), dan `docs/07 §8` menetapkan LCP
+≤ 2,5 detik pada 4G dengan transfer pertama ≤ 500 KB (NFR-PERF-03/04).
+Inertia yang dirender di peramban tidak dapat memenuhi keduanya: tanpa
+JavaScript halamannya kosong — bukan sekadar kurang rupawan — dan paket Vue
+saja sudah memakan sebagian besar anggaran 500 KB sebelum satu kata pun dari
+isi desa ikut terkirim.
+
+**Pilihan yang dipertimbangkan:** (a) Inertia seperti panel, menerima halaman
+kosong tanpa JS; (b) Inertia + SSR; (c) Blade yang dirender server.
+
+**Keputusan:**
+1. Dipilih **(c)**. Portal publik — beranda, profil, pemerintahan, wilayah,
+   layanan, statistik, kontak — dirender Blade dan tidak memuat satu berkas
+   JavaScript pun. Isinya sudah utuh pada HTML pertama.
+2. **(b) ditolak.** Inertia SSR memperbaiki keduanya, tetapi menuntut satu
+   proses Node berjalan terus di produksi, dipantau, dan dihidupkan ulang
+   bila mati. Sistem ini harus dapat dirawat perangkat desa setelah serah
+   terima (docs/01 §6) — alasan yang sama yang melahirkan KEP-005 dan membuat
+   KEP-007 menyarankan Vue hanya pada layar yang membutuhkannya. Portal yang
+   seluruhnya teks dan tabel adalah justru layar yang **tidak** membutuhkannya.
+3. **(a) ditolak** karena bukan penurunan mutu yang anggun melainkan kegagalan
+   total: pengunjung dengan JS gagal dimuat melihat halaman putih di situs
+   resmi desanya. Pada jaringan desa itu bukan kemungkinan teoretis.
+4. Gayanya tetap **satu sumber**: Blade memakai `resources/css/app.css` yang
+   sama dengan panel. Padanan Blade dibuat hanya untuk komponen yang memang
+   dipakai portal (sudah ada `<x-alert>`), bukan menyalin seluruh pustaka Vue.
+   Ikon digambar sebagai SVG sebaris; portal tidak memuat paket ikon.
+5. **Batasnya jelas:** halaman publik yang berupa FORMULIR dengan keadaan
+   validasi — verifikasi keaslian surat dan pelacakan status — tetap Inertia
+   dan tidak ditulis ulang. Keduanya sudah berjalan dan berujinya lengkap,
+   bukan halaman yang dituju mesin pencari, dan menulis ulang kode yang sudah
+   benar bukan pekerjaan gratis. Yang mengikat adalah arahnya: halaman portal
+   **baru** dibangun dengan Blade.
+6. Portal punya kerangka `<head>` **sendiri**, terpisah dari `app.blade.php`.
+   Akar Inertia memasang `noindex, nofollow` untuk seluruh panel administrasi;
+   portal justru harus terindeks (FR-PRT-08). Memakai satu akar untuk keduanya
+   berarti satu baris meta yang menentukan apakah situs desa muncul di mesin
+   pencari atau tidak — dan baris itu akan berubah karena alasan yang tidak ada
+   hubungannya dengan portal.
+7. `sitemap.xml` dan `robots.txt` **dibangkitkan**, bukan berkas statis di
+   `public/`: daftar layanan berubah dari panel petugas tanpa rilis baru, dan
+   baris `Sitemap:` menuntut URL absolut yang tidak diketahui sebuah berkas
+   statis. `PublicPortalTest` menjaga agar panel administrasi dan halaman
+   pelacakan tidak pernah masuk ke peta situs.
+
+**Konsekuensi yang diterima:** "statistik interaktif" pada FR-PRT-05 menjadi
+grafik batang CSS dengan tabel angka di bawahnya, bukan grafik yang dapat
+disaring di peramban. Penyaringan per wilayah memang tidak dikehendaki di
+halaman publik (ADR-008, lihat §3 keterangan di `portal/statistik.blade.php`),
+sehingga yang hilang hanyalah animasi — sementara yang didapat adalah halaman
+yang terbaca pembaca layar dan tetap hidup tanpa JavaScript.
+
+---
+
+## KEP-017 — Pendaftaran warga: satu jawaban untuk semua hasil
+**Tanggal:** 2026-10-18 · **Status:** Wajib · **Kategori:** keamanan, privasi
+
+**Masalah yang ditemukan:** FR-AUT-08 meminta pendaftaran warga mencocokkan
+NIK + nomor KK + nama ke data penduduk, dan FR-AUT-10 melarang sistem
+mengungkap apakah suatu NIK terdaftar. Keduanya bertabrakan pada hal yang
+paling lumrah di setiap formulir pendaftaran: pesan galat yang menolong.
+"NIK tidak ditemukan", "NIK ini sudah punya akun", dan "email sudah dipakai"
+masing-masing menjawab pertanyaan yang tidak berhak ditanyakan orang asing.
+NIK berpola — enam digit pertamanya kode wilayah, enam berikutnya tanggal
+lahir — sehingga ruang tebakannya jauh lebih kecil daripada enam belas digit
+acak. Formulir yang membedakan jawabannya karena itu bukan sekadar bocor
+sedikit: ia dapat dipakai menyusun daftar penduduk desa, lengkap dengan
+tanggal lahirnya, tanpa pernah masuk ke sistem.
+
+**Pilihan yang dipertimbangkan:** (a) pesan galat spesifik, dengan pembatasan
+laju sebagai satu-satunya pagar; (b) satu jawaban seragam untuk semua hasil;
+(c) verifikasi lewat OTP ke nomor ponsel lebih dulu, baru pencocokan.
+
+**Keputusan:**
+1. Dipilih **(b)**. Setiap pengiriman formulir berakhir di halaman
+   `daftar/terkirim` yang sama persis — cocok, tidak cocok, penduduk sudah
+   punya akun, atau kontak sudah dipakai. `CitizenRegistrationService::register()`
+   karena itu tidak mengembalikan apa pun dan tidak melempar pengecualian
+   untuk ketidakcocokan.
+2. **Harga yang dibayar diakui, dan dibayar di tempat lain.** Warga yang salah
+   mengetik satu huruf namanya akan menunggu tanpa tahu apa yang keliru. Maka
+   halaman konfirmasi WAJIB memuat jalan keluar untuk setiap kemungkinan:
+   tautan atur ulang kata sandi bagi yang mungkin sudah punya akun, dan ajakan
+   datang ke kantor desa membawa KTP dan KK bagi yang datanya tidak cocok.
+   Halaman itu bagian dari keputusan ini, bukan hiasan — tanpanya pilihan (b)
+   memindahkan beban ke warga dan berhenti di situ.
+3. **Yang TETAP dijawab terang** adalah galat tentang data pemohon sendiri:
+   kata sandi terlalu pendek, email dan nomor ponsel dua-duanya kosong, foto
+   KTP bukan gambar. Tak satu pun menyatakan apa pun tentang warga lain, dan
+   membungkamnya hanya membuat formulir terasa rusak.
+4. Pencocokan menuntut **ketiganya cocok** dan penduduknya **aktif** (RULE-03).
+   NIK saja tidak cukup: ia beredar di fotokopi KTP yang tertinggal di mana-
+   mana, sedangkan nomor KK beserta ejaan nama adalah dua hal yang praktis
+   hanya diketahui orang di dalam keluarga itu.
+5. Pencocokan **mengabaikan lingkup akses** (`findByNikIgnoringScope`), dan
+   memang harus: pemohon adalah tamu tanpa AccessScope sama sekali. Yang
+   menjaga keamanannya bukan lingkup melainkan tiga syarat serentak di atas,
+   ditambah `throttle:5,60` pada rutenya.
+6. Percobaan yang tidak cocok dicatat sebagai `citizen.registration_unmatched`
+   dengan **NIK ter-hash**, bukan terbaca. Petugas dapat melihat ada berapa
+   banyak percobaan gagal dan mengenali pola percobaan berurutan; audit log
+   tidak menjadi tempat penyimpanan NIK baru di luar tabel penduduk.
+7. **(c) ditolak** untuk Fase 1: pengiriman OTP menuntut layanan SMS/WhatsApp
+   berbayar, yang dilarang docs/03 §2.4 pada MVP, dan menutup warga yang
+   mendaftar dengan email saja.
+8. **Foto KTP dihapus begitu petugas memutuskan**, disetujui maupun ditolak.
+   Ia hanya diperlukan untuk satu keputusan, dan keputusan itu sudah diambil.
+   Menyimpannya "untuk jaga-jaga" berarti desa memelihara arsip foto KTP
+   seluruh warganya — sasaran yang lebih berharga bagi penyerang daripada
+   basis datanya sendiri, dan tidak diminta satu pun kebutuhan (docs/08 §3).
+9. Verifikasi dijaga `pengguna.verifikasi`, yang pada matriks RBAC hanya
+   dimiliki Admin Desa, dan rutenya menolak akun yang bukan warga menunggu
+   verifikasi dengan **404**. Tanpa pagar itu, rute ini menjadi cara
+   mengaktifkan akun apa pun yang kebetulan berstatus menunggu — termasuk
+   akun petugas yang sengaja dinonaktifkan.
+
+---
+
+## KEP-018 — Pengaduan: dua kolom tenggat, dan sidik jari IP alih-alih alamatnya
+**Tanggal:** 2026-10-22 · **Status:** Wajib · **Kategori:** model data, privasi
+
+**Masalah yang ditemukan:** skema `complaints` pada docs/05 §3.5 menyediakan
+**satu** kolom tenggat (`due_at`) dan satu kolom alamat IP (`submitted_ip`).
+Keduanya ternyata tidak cukup ketika FR-PGD-06 dan RULE-09 dikerjakan
+bersamaan.
+
+*Tenggat.* FR-PGD-06 menetapkan **dua** batas yang berjalan berurutan: triase
+2 hari dan penyelesaian 14 hari kerja. Satu kolom memang cukup untuk
+menampilkan "terlambat" hari ini — maknanya tinggal berpindah mengikuti status
+— tetapi ia **menimpa** angka tenggat triase begitu pengaduan ditriase.
+Akibatnya pertanyaan "berapa persen pengaduan ditriase tepat waktu" hanya
+dapat dijawab untuk pengaduan yang BELUM ditangani, yaitu justru yang belum
+punya hasil. Ketepatan triase adalah satu-satunya angka yang menunjukkan
+apakah pengaduan warga dibaca orang, dan ia hilang tepat ketika pengaduannya
+selesai.
+
+*Alamat IP.* FR-PGD-08 menuntut pembatasan laju per IP, dan skema menyimpan
+alamatnya mentah. Tetapi audit log mencatat `ip_address` setiap kali seseorang
+masuk. Alamat mentah di tabel pengaduan karena itu dapat **di-JOIN** dengan
+baris login: pengaduan anonim tentang pungutan liar menjadi bernama kembali
+lewat dua kueri, oleh orang yang berhak membaca audit log — yaitu Admin Desa,
+yang justru paling sering menjadi pihak yang diadukan. CHECK
+`chk_complaints_anon` tidak menolong sama sekali, karena kolom itu memang tidak
+dilarangnya.
+
+**Pilihan yang dipertimbangkan:** (a) tetap satu kolom tenggat yang maknanya
+berpindah, dan terima hilangnya angka ketepatan triase; (b) tambah kolom
+`triage_due_at`; (c) tabel riwayat tenggat tersendiri. Untuk IP: (d) simpan
+mentah dan andalkan kebijakan agar tidak di-JOIN; (e) jangan simpan apa pun
+dan andalkan middleware `throttle` saja; (f) simpan sidik jari ber-kunci.
+
+**Keputusan:**
+1. Dipilih **(b)**. Kolom `triage_due_at DATETIME NULL` ditambahkan. Ia diisi
+   **sekali** saat pengaduan masuk dan **tidak pernah diubah lagi**, termasuk
+   setelah ditriase — yang membuatnya berguna justru keabadiannya.
+   `due_at` tetap seperti pada docs/05, diisi saat triase.
+   `Complaint::activeDueAt()` yang memutuskan mana yang sedang ditunggu.
+   **(c) ditolak** karena satu tabel tambahan untuk dua angka per baris adalah
+   harga yang tidak sebanding, dan ia menambah satu gabungan pada setiap
+   tampilan antrean.
+2. **Tenggat penyelesaian dihitung dari saat TRIASE**, bukan dari saat
+   pengaduan masuk. Pengaduan yang didiamkan sepuluh hari lalu baru ditriase
+   tidak lantas tersisa empat hari: itu menghukum petugas yang akhirnya
+   menanganinya dan menyembunyikan keterlambatan yang sebenarnya terjadi di
+   tahap triase. Keterlambatan itu punya catatannya sendiri, dan itulah yang
+   harus dibaca bila angka SLA desa terlihat buruk.
+3. Dipilih **(f)**. `submitted_ip VARCHAR(45)` diganti
+   `submitted_ip_hash CHAR(64)` berisi HMAC-SHA256 ber-pepper (`PiiCipher`).
+   Yang dibutuhkan FR-PGD-08 hanyalah perbandingan sama-tidak-sama, dan itu
+   dapat dijawab tanpa pernah menyimpan alamatnya.
+   **HMAC dan bukan hash biasa**, dengan alasan yang sama seperti NIK: ruang
+   IPv4 hanya 4 miliar nilai, sehingga tabel pelanginya dapat dibangun dalam
+   hitungan menit dan hash biasa tidak melindungi apa pun bila basis data
+   bocor. **(e) ditolak** karena middleware `throttle` menghitung permintaan
+   HTTP dan lupa setiap kali cache dibersihkan; hitungan baris tetap berlaku
+   melewati penyetelan ulang cache.
+4. **Batas SLA-nya sendiri dibaca dari tabel `settings`**
+   (`complaint.triage_sla_days`, `complaint.resolution_sla_days`) dengan
+   bawaan FR-PGD-06, bukan dari `config/sid.php`: ia aturan bisnis yang boleh
+   berbeda per desa. Yang di `config/sid.php` hanya batas teknis per jaringan.
+5. **Keterlambatan SELALU dihitung kueri, tidak pernah disimpan.** Perintah
+   `sid:eskalasi-pengaduan` hanya menaikkan prioritas dan mengirim notifikasi
+   — dua hal yang memang menuntut pemicu. Konsekuensinya disengaja: penjadwal
+   yang mati membuat desa kehilangan PERINGATAN, bukan kehilangan kebenaran,
+   dan tidak ada satu angka pun di layar yang menjadi salah karenanya. Pola
+   yang sama dengan penjadwalan terbit konten portal (Sprint 6).
+
+**Konsekuensi yang diterima:** docs/05 §3.5 tidak lagi menggambarkan tabel
+`complaints` secara persis — dua kolomnya berbeda. Dokumen model data harus
+diperbarui pada penyelarasan berikutnya; sampai itu terjadi, entri ini adalah
+sumber kebenarannya. Satu kolom tambahan juga berarti satu indeks tambahan
+(`idx_complaints_triage_due`), yang dibayar pada setiap penyisipan pengaduan —
+jumlah yang kecil dibanding nilai angka ketepatan triase.
+
+Konsekuensi kedua, lebih halus: `submitted_ip_hash` tidak dapat dibaca
+manusia. Perangkat desa yang ingin tahu "pengaduan ini datang dari mana" tidak
+akan pernah mendapat jawabannya dari basis data, dan memang tidak boleh —
+pertanyaan itu sendiri adalah bentuk pembukaan keanoniman.
+
+---
+
+## KEP-019 — Indeks penutup untuk halaman Laporan, dan mengapa indeks terpisah ditolak
+**Tanggal:** 2026-10-24 · **Status:** Wajib · **Kategori:** kinerja, model data
+
+**Masalah yang ditemukan:** uji beban & volume Sprint 7
+(`docs/23-uji-beban-sprint-7.md`) menyemai 20.000 penduduk — volume sasaran
+resmi proyek (NFR-PERF-07) — lalu mengukur setiap halaman. Satu halaman
+melewati NFR-PERF-01 (p95 baca ≤ 500 ms) **sendirian**:
+`ReportService::population()` terukur **755 ms**.
+
+Sebabnya bukan satu kueri yang rumit, melainkan **enam kali membaca tabel yang
+sama**. Halaman Laporan menampilkan rekap per wilayah dan per lima kategori
+(jenis kelamin, agama, pendidikan, pekerjaan, status perkawinan). Setiap rekap
+menyaring `status = 'aktif' AND deleted_at IS NULL`, lalu membaca **satu kolom
+lain** per baris. Indeks `idx_residents_status` hanya memuat kedua kolom
+penyaring itu, sehingga kolom kategorinya harus diambil dari indeks berkluster
+— 19.600 pencarian baris acak, per rekap, dengan kunci primer CHAR(36).
+Terukur 70–88 ms untuk setiap kategori, dan 370 ms untuk rekap per wilayah
+yang bahkan menghidrasi 20.000 objek Eloquent hanya untuk menambahkannya ke
+tiga penghitung.
+
+Yang pantas dicatat adalah **mengapa ini tidak pernah terlihat sampai Sprint
+7**: basis data pengembangan berisi 500 penduduk (docs/09 §3), dan pada 500
+baris keenam pembacaan itu masing-masing 2 ms. Halaman ini tidak pernah
+melambat di mana pun yang dilihat orang — ia hanya akan melambat di desa,
+setelah impor data kependudukan yang sebenarnya.
+
+**Pilihan yang dipertimbangkan:**
+(a) biarkan, dan andalkan cache halaman;
+(b) tabel ringkasan seperti `population_stats` (ADR-007) untuk laporan juga;
+(c) indeks penutup **baru** khusus rekap;
+(d) **lebarkan** `idx_residents_status` yang sudah ada;
+(e) satukan kelima rekap menjadi satu kueri `GROUP BY` kombinasi, tanpa
+    indeks baru.
+
+**Keputusan: (d) + (e), dua-duanya.**
+
+1. **`idx_residents_status` dilebarkan** dari `(status, deleted_at)` menjadi
+   `(status, deleted_at, region_id, gender, religion_code, education_code,
+   occupation_code, marital_status_code)` — migrasi
+   `2026_01_08_000100_widen_residents_status_index_for_reports.php`.
+2. **Kelima rekap kategori menjadi SATU kueri**
+   (`ResidentRepository::recapByCategories()`), dikelompokkan menurut
+   kombinasi kelima kolom lalu dijumlahkan per kolom di PHP — pekerjaan di
+   bawah satu milidetik atas ratusan baris kombinasi.
+3. **Rekap per wilayah dihitung basis data** (`GROUP BY region_id, gender`,
+   ± 24 baris), bukan dengan memuat seluruh penduduk. Pemetaan RT → dusun
+   memakai satu kueri tabel `regions` dan segmen pertama kolom `path`.
+
+Hasil terukur pada 20.000 penduduk, mesin yang sama:
+
+| | sebelum | sesudah |
+|---|---|---|
+| rekap per wilayah | 370 ms | 10 ms |
+| rekap lima kategori | 385 ms | 22 ms |
+| `ReportService::population()` | 755 ms | 43 ms |
+| halaman `/laporan`, waktu basis data | 495 ms | 66 ms |
+
+**Mengapa (c) ditolak, dan ini alasan yang hanya muncul setelah diukur:**
+indeks penutup terpisah memang membuat kelima kueri lama menjadi 10–22 ms —
+**tetapi hanya dengan `FORCE INDEX`**. Pengoptimasi MySQL tetap memilih
+`idx_residents_status` yang lebih sempit karena biaya perkiraannya lebih
+rendah, dan `EXPLAIN` menunjukkan indeks baru itu tidak pernah dipakai dengan
+sendirinya. Petunjuk indeks di dalam Eloquent adalah janji yang patah tanpa
+suara pada versi MySQL berikutnya, dan kegagalannya tidak berupa galat
+melainkan halaman yang perlahan melambat — kelas bug yang tidak pernah
+terlihat di CI. Melebarkan indeks yang **sudah** dipilih menghapus pilihan
+yang perlu dipaksakan. Nama indeksnya pun sengaja dipertahankan, karena dua
+kolom pertamanya tetap sama persis sehingga tidak ada satu pun rencana kueri
+lain yang berubah.
+
+**Mengapa (b) ditolak:** `population_stats` memang sudah ada, tetapi ia
+**mengabaikan lingkup akses** dengan sengaja (ADR-007: ia hanya menyajikan
+agregat publik). Laporan internal WAJIB mengikuti lingkup — Kepala Dusun
+merekap dusunnya sendiri (docs/04 §4.1) — sehingga ia memerlukan tabel
+ringkasan per wilayah per peran, yaitu cache yang harus dibatalkan setiap kali
+satu penduduk berubah. Satu indeks lebih sederhana dan tidak dapat kedaluwarsa.
+
+**Mengapa (a) ditolak:** laporan yang di-cache adalah laporan yang angkanya
+berbeda dari layar penduduk di sebelahnya, dan perangkat desa akan menemukan
+selisih itu pada saat yang paling buruk — di rapat.
+
+**Konsekuensi yang diterima:**
+
+1. **Enam kolom tambahan (± 110 byte per baris) dibayar pada setiap
+   penyisipan dan setiap perubahan salah satu kolom itu.** Yang ditukar
+   disengaja: di satu desa, perubahan data penduduk berjumlah puluhan per
+   hari dan tidak ada yang menungguinya; halaman Laporan dibuka beberapa kali
+   sehari oleh orang yang menunggu di depan layar.
+2. **Impor massal menjadi sedikit lebih lambat.** Impor 20.000 baris
+   memperbarui satu indeks yang lebih lebar. Pada penyemai volume, selisihnya
+   tidak terukur di atas derau.
+3. **docs/05-model-data.md §3.2 masih menuliskan indeks yang lama.** Sampai
+   dokumen itu diselaraskan, entri ini adalah sumber kebenarannya.
+4. **Daftar putih kolom rekap kini dipakai di dua tempat** (satu kolom dan
+   beberapa kolom). Nama kolom tidak dapat diikat sebagai parameter SQL, jadi
+   daftar putih itu satu-satunya yang memisahkan laporan dari injeksi SQL;
+   ia karena itu dijaga uji sendiri
+   (`tests/Feature/Report/ReportRecapQueryTest.php`).
+
+---
+
+## KEP-020 — Rumus hash audit log: dua cacat berlawanan arah, dan satu baris mutex
+**Tanggal:** 2026-10-29 · **Status:** Wajib · **Kategori:** integritas bukti, konkurensi, kinerja
+
+**Masalah yang ditemukan.** Uji beban & volume Sprint 7
+(docs/23-uji-beban-sprint-7.md §7) menemukan tiga cacat pada mekanisme rantai
+hash audit log, dan ketiganya sengaja tidak diperbaiki di sana karena dua di
+antaranya menyentuh integritas **bukti** — ADR-005, RULE-12, docs/08 §9 — dan
+bukan kinerja kueri. Entri ini adalah keputusan yang dituntut temuan itu.
+
+Saat memperbaikinya, cacat **keempat** ditemukan: ia tidak terlihat di laporan
+uji beban karena ia dan cacat pertama saling menutupi.
+
+### Empat cacat, dua di antaranya berlawanan arah
+
+**(1) Kolom `changes` tidak pernah ikut di-hash — alarm yang DIAM.**
+`AuditLog::computeHash()` memakai `$this->changes`. Di dalam kelas model, nama
+itu tidak mengenai kolom `changes`: ia mengenai properti protected `$changes`
+milik `Illuminate\Database\Eloquent\Concerns\HasAttributes` — daftar atribut
+yang berubah setelah `save()`, yang di titik itu selalu `[]`. Dari **luar**
+kelas, `$entry->changes` justru mengembalikan isi kolomnya, karena properti
+protected tidak terjangkau dan PHP jatuh ke `__get()`. Dua nilai berbeda untuk
+satu nama, dan yang terpakai justru yang kosong. Akibatnya nilai lama/baru data
+penduduk dapat diubah langsung di basis data **tanpa merusak rantai**, dan
+`sid:verify-audit-chain` tetap melaporkan "rantai utuh" — padahal justru kolom
+itulah yang berisi datanya; sisanya hanya menyebutkan siapa dan kapan.
+Bertahan tujuh sprint tanpa terlihat.
+
+**(2) Urutan kunci JSON tidak kanonik — alarm yang BERBUNYI atas data jujur.**
+Rumus lama meng-encode kedua kolom JSON menurut urutan kunci yang kebetulan
+dipakai pemanggil. MySQL menyimpan kolom JSON dalam bentuk binernya sendiri
+dan mengembalikan kuncinya **terurut** (panjang, lalu leksikal), pada setiap
+tingkat sarang. Baris yang ditulis sebagai
+`{"nomor_surat":…,"jenis_surat":…,"tiket":…}` dibaca kembali sebagai
+`{"tiket":…,"jenis_surat":…,"nomor_surat":…}`; `json_encode` mempertahankan
+urutan masukan, sehingga hash saat verifikasi berbeda dari hash saat penulisan.
+
+Ini bukan cacat kecil, dan bukan pula sekadar kebalikan dari (1). Pada basis
+data pengembangan, `sid:verify-audit-chain` **memang berbunyi "RANTAI RUSAK"**
+— pada baris `letter.issued` id=7, yang tidak pernah disentuh siapa pun. Kami
+membuktikan sebabnya dengan mencoba setiap permutasi kunci pada baris itu:
+hash-nya cocok persis bila kuncinya disusun `nomor_surat, jenis_surat, tiket`,
+yaitu urutan tulisnya. Barisnya utuh; rumusnya yang salah.
+
+Dan akibatnya lebih buruk daripada kebisingan: **alarm integritas bukti yang
+berbunyi atas data jujur akan diabaikan**, dan kendali yang diabaikan sama
+nilainya dengan kendali yang tidak ada. Satu-satunya alasan hal ini belum
+pernah merugikan adalah bahwa tidak ada yang pernah menjalankan perintah itu
+pada basis data yang memuat baris semacam itu — persis sampai uji volume
+Sprint 7 melakukannya.
+
+Kedua cacat ini saling menutupi di laporan uji beban: penyemai volume
+menyesuaikan diri dengan perilaku (1), dan konteks yang dibuatnya berkunci
+tunggal sehingga (2) tidak muncul di sana.
+
+**(3) Deadlock MySQL 1213 pada penulisan bersamaan.** `AuditLogger` merantai
+dengan `ORDER BY id DESC LIMIT 1 FOR UPDATE`. Pada InnoDB kunci itu mencakup
+celah sesudah baris terakhir, dan **gap lock saling kompatibel** — dua
+transaksi dapat memegangnya bersamaan. Begitu keduanya hendak menyisipkan ke
+dalam celah itu, kunci insert-intention yang diperlukan bertentangan dengan gap
+lock transaksi lain, keduanya menunggu, dan MySQL membunuh salah satunya.
+Tidak perlu sumber daya ketiga: dua penulisan audit biasa sudah cukup. Uji
+beban menangkapnya satu kali dalam ± 44 menit pada jalur login; bagi petugas
+yang mengalaminya ia berupa HTTP 500.
+
+**(4) `sid:verify-audit-chain` tumbuh kuadratik.** `verifyChain()` memakai
+`lazy(500)`, yang memecah kueri dengan LIMIT/OFFSET dan bukan dengan kunci.
+Pada potongan terakhir MySQL melewati 1,5 juta baris — dan melakukannya lagi
+untuk setiap potongan. Terukur: setiap kali datanya dua kali lebih banyak,
+waktunya tiga setengah kali lebih lama.
+
+### Keputusan
+
+**1. Satu rumus hash, ditulis satu kali, atas representasi MENTAH baris.**
+`AuditLog::hashFromRow(array $row, ?string $prev)` menjadi satu-satunya tempat
+rumusnya ada. Ia dipanggil dua kali selama hidup sebuah baris: saat penulisan
+(dari atribut model) dan saat verifikasi (dari baris mentah basis data).
+`computeHash()` hanya meneruskan `$this->getAttributes()` kepadanya.
+
+Itu bukan selera gaya. Cacat (1) terjadi **karena** ada dua jalur yang dapat
+menyimpang — `$this->changes` di dalam kelas dan `$entry->changes` di luarnya —
+dan satu-satunya pencegah yang bertahan terhadap orang yang tidak tahu
+tentangnya adalah tidak punya dua jalur. Mengambil nilainya dari atribut
+mentah juga berarti nama kolom tidak dapat lagi bertabrakan dengan properti
+kerangka kerja apa pun, sekarang maupun pada pembaruan Laravel berikutnya.
+
+**2. Kedua kolom JSON di-hash dalam bentuk kanonik** (kunci objek diurutkan
+rekursif; urutan senarai dibiarkan, karena urutan senarai bermakna dan MySQL
+pun mempertahankannya). Dengan itu apa yang dihitung saat penulisan dan saat
+verifikasi tidak dapat lagi berbeda karena cara MySQL menyimpannya.
+
+*Yang ditolak:* menyimpan `changes` dan `context` sebagai `LONGTEXT` agar
+bytenya terjaga apa adanya. Itu memang menghapus masalahnya pada sumbernya,
+tetapi membuang kemampuan menyaring JSON di basis data — yang akan dibutuhkan
+halaman Log Aktivitas — dan menukar satu cacat halus dengan satu migrasi berat
+atas tabel terbesar di sistem.
+
+**3. Kolom `hash_version`, dan baris lama TIDAK dihitung ulang.**
+Mengubah rumusnya membatalkan `row_hash` seluruh baris yang sudah ada. Kolom
+`hash_version` membuat verifikasi tahu rumus mana yang berlaku per baris, tanpa
+menyentuh satu baris lama pun — syarat mutlak pada tabel yang hak akses MySQL-nya
+memang menolak UPDATE.
+
+Yang penting dinyatakan terbuka: **baris v1 tidak dapat dihitung ulang sama
+sekali**, dan itu bukan kelonggaran melainkan sifat cacat (2). Urutan kunci
+JSON saat penulisan **hilang** ketika MySQL menyimpannya; tidak ada cara
+mereproduksinya dari apa yang tersimpan. Karena itu `verifyChain()` memeriksa
+baris v1 hanya pada **sambungannya** (`prev_hash` terhadap `row_hash` baris
+sebelumnya), yang tetap mendeteksi penyisipan dan penghapusan baris, dan
+melaporkan jumlahnya **terpisah** agar tidak pernah terbaca sebagai baris yang
+terverifikasi. Yang tidak terdeteksi pada baris v1 adalah perubahan medan di
+tempat — yang pada baris v1 memang **tidak pernah** terdeteksi: untuk `changes`
+karena kolomnya tidak ikut di-hash, untuk `context` karena alarmnya berbunyi
+atas data jujur sehingga tidak dapat dipercaya. Jaminan yang hilang karena
+keputusan ini: tidak ada. Jaminan yang didapat baris baru: keduanya.
+
+Hal itu dapat diterima **hanya karena sistem ini belum pernah berjalan di
+desa** (milestone M5 "Siap UAT"): seluruh baris v1 adalah data pengembangan dan
+demo. Bila entri ini dibaca setelah sistem berjalan, keputusannya **tidak**
+berlaku lagi untuk perubahan rumus berikutnya — pemotongan rantai pada data
+produksi menuntut titik potong yang ditandatangani, dan itu keputusan lain.
+
+*Mengapa bawaan kolomnya 1 dan bukan 2:* baris yang sudah ada mendapat 1 tanpa
+satu pernyataan UPDATE pun, dan baris baru yang disisipkan sesuatu yang tidak
+mengenal kolom ini (penyisipan massal lewat `DB::table()`) juga mendapat 1 —
+jawaban yang benar, karena penyisip yang tidak tahu tentang versi hash hampir
+pasti juga tidak memakai rumus yang berlaku sekarang. Bawaan 2 akan membuat
+baris semacam itu **mengaku** v2 lalu gagal verifikasi.
+
+**4. Satu baris mutex (`audit_chain_lock`) diambil SEBELUM ujung rantai
+dibaca** — ini jawaban atas cacat (3), dan ia bukan salah satu dari tiga arah
+yang direkomendasikan laporan uji beban.
+
+Kunci baris pada pencarian kesetaraan kunci primer tidak mengambil gap lock apa
+pun, sehingga dua penulisan audit tidak lagi dapat saling menunggu: yang kedua
+hanya **menunggu** yang pertama selesai. Deadlock (dibatalkan) menjadi lock
+wait (ditunggu). `FOR UPDATE` pada pembacaan ujung rantai **tetap ada**, kini
+tidak pernah diperebutkan, karena ia yang memastikan ujung rantai dibaca dalam
+versi terbaru dan bukan dari snapshot REPEATABLE READ transaksi pemanggil —
+yang dapat lebih tua daripada baris yang baru saja di-commit permintaan lain.
+
+Dibuktikan langsung, enam proses bersamaan dengan jendela diperlebar: **5 dari
+6 gagal dengan 1213** tanpa baris mutex, **6 dari 6 berhasil** dengannya.
+
+*Mengapa bukan ketiga arah yang direkomendasikan laporan:*
+
+- **Percobaan ulang `DB::transaction($cb, 3)` pada layanan penulis** ditolak
+  karena ia mengobati gejala di 32 tempat, bukan sebabnya di satu tempat. Ada
+  32 pemanggilan `DB::transaction` di 13 layanan; setiap satunya menuntut bukti
+  idempotensi sendiri, dan penulis layanan **berikutnya** tidak akan tahu bahwa
+  ia harus menambahkannya. Cacat yang penangkalnya harus diingat di tiap tempat
+  baru adalah cacat yang akan kembali.
+- **Middleware yang mengulang permintaan tulis** ditolak karena efek di luar
+  transaksi — notifikasi, berkas PDF, surel — akan terulang bersamanya.
+- **Melepas rantai ke pekerjaan latar belakang** ditolak karena ia memindahkan
+  jaminan keutuhan dari "saat ditulis" ke "beberapa saat kemudian", yaitu
+  mengubah sifat buktinya untuk memperbaiki kinerja yang belum menjadi sumbat.
+
+Percobaan ulang di tingkat transaksi terluar **tidak menjadi salah** karenanya;
+ia hanya tidak lagi diperlukan untuk sebab ini, dan tetap menjadi langkah
+berikutnya bila 40001 muncul dari tabel lain.
+
+*Yang SENGAJA tidak dilakukan:* tabel mutex itu **tidak** menyimpan hash ujung
+rantai. Menyimpannya akan membuat dua sumber kebenaran untuk pertanyaan "baris
+terakhir apa", dan sumber kedua itu akan basi setiap kali ada yang menyisipkan
+ke `audit_logs` tanpa melewati `AuditLogger` — yang dilakukan penyemai volume.
+Ujung rantai tetap dibaca dari `audit_logs`.
+
+**5. `verifyChain()` memakai `lazyById()` dan baris mentah.** Perbedaan
+`lazy()` dan `lazyById()` berupa satu kata, keduanya tampak sama di layar, dan
+keduanya benar — hanya salah satunya yang masih benar pada satu juta baris.
+Hash dihitung dari baris mentah, sehingga 1,5 juta objek Eloquent beserta cast
+JSON dua kolomnya tidak perlu dibuat.
+
+### Konsekuensi yang diterima
+
+1. **Satu titik serialisasi global tetap ada** dan kini eksplisit: setiap
+   penulisan yang diaudit menunggu pada satu baris yang sama, dan karena
+   `AuditLogger` hampir selalu berjalan di dalam transaksi pemanggil, mutex-nya
+   dilepas saat transaksi **terluar** commit. Itu sudah begitu sebelum entri
+   ini; yang berubah hanyalah bahwa ia dapat dibaca dari kodenya. Konsekuensi
+   yang menuntut kepatuhan: **baris audit dicatat SETELAH penulisan datanya,
+   tidak sebelum.** Layanan yang mengunci baris data sesudah memanggil pencatat
+   mengembalikan kemungkinan deadlock lewat pintu lain — kali ini antara mutex
+   dan tabel datanya.
+2. **`sid:verify-audit-chain` kini melaporkan dua angka**, dan yang kedua
+   berupa peringatan. Pada basis data mana pun yang berisi baris sebelum entri
+   ini, peringatan itu akan selalu muncul. Itu disengaja: ia menyebutkan dengan
+   tepat apa yang sedang dan tidak sedang dijamin.
+3. **`VolumeSeeder::chainHash()` wajib mengikuti rumus baru**, termasuk
+   mengurutkan kuncinya dan mengisi `hash_version = 2`. Penyemai yang tertinggal
+   akan membuat `sid:verify-audit-chain` melaporkan rantai rusak atas data yang
+   ia sendiri buat.
+4. **Satu tabel satu kolom satu baris** (`audit_chain_lock`) yang tidak
+   menyimpan apa pun akan terlihat seperti sisa yang terlupakan bagi siapa pun
+   yang tidak membaca entri ini. Karena itu alasannya ditulis panjang di
+   migrasinya dan di `AuditLogger::append()`, dan dijaga uji
+   `AuditChainConcurrencyTest`.
+
+### Dijaga uji
+
+- `tests/Feature/AuditLogTest::perubahan_kolom_changes_terdeteksi` — mengubah
+  kolom `changes` satu baris langsung di basis data lalu menuntut verifikasi
+  **gagal**. Sebelum entri ini, uji ini lulus padahal seharusnya gagal.
+- `tests/Feature/AuditLogTest::urutan_kunci_json_tidak_merusak_rantai` — sisi
+  sebaliknya: baris yang kuncinya diurutkan ulang MySQL **tidak** boleh
+  dilaporkan rusak.
+- `tests/Feature/Audit/AuditChainConcurrencyTest` — dua belas pencatatan
+  bersamaan di proses terpisah semuanya berhasil dan rantainya tetap satu; dan
+  pembuktian bahwa baris mutex-lah yang menghapus 1213.
+

@@ -25,9 +25,47 @@ use DOMNode;
  *
  * Dipakai di DUA titik — saat template disimpan dan saat surat dirender —
  * karena template yang sudah tersimpan sebelum aturan ini ada juga harus aman.
+ *
+ * DUA PROFIL, BUKAN SATU DAFTAR GABUNGAN
+ * --------------------------------------
+ * Profil `surat` (bawaan) untuk template surat; profil `artikel` untuk isi
+ * berita, pengumuman, dan agenda di portal, yang memang memerlukan tautan dan
+ * gambar. Keduanya TIDAK disatukan: surat resmi tidak pernah memuat tautan,
+ * dan mengizinkan <a> di sana hanya memperlebar permukaan serangan pada
+ * dokumen yang dibaca Kepala Desa saat menyetujui.
  */
 final class HtmlSanitizer
 {
+    public const PROFIL_SURAT = 'surat';
+
+    public const PROFIL_ARTIKEL = 'artikel';
+
+    /**
+     * Tambahan khusus artikel portal: tautan dan gambar.
+     *
+     * `target` TIDAK diizinkan meski lumrah. target="_blank" tanpa
+     * rel="noopener" membuka reverse tabnabbing, dan menambahkan rel otomatis
+     * berarti menyunting atribut yang diketik petugas tanpa ia tahu. Tautan
+     * yang terbuka di tab yang sama tidak punya masalah itu sama sekali.
+     */
+    private const ARTICLE_TAGS = ['a', 'img', 'figure', 'figcaption'];
+
+    /** @var array<string, list<string>> */
+    private const ARTICLE_ATTRIBUTES = [
+        'a' => ['href', 'title'],
+        'img' => ['src', 'alt', 'width', 'height', 'loading'],
+    ];
+
+    /**
+     * Skema URL yang boleh muncul pada href/src.
+     *
+     * `data:` ditolak walau terlihat tidak berbahaya untuk gambar: ia juga
+     * menerima `data:text/html`, dan ukurannya melanggar anggaran 500 KB
+     * halaman portal (NFR-PERF-04). URL relatif (diawali `/` atau tanpa
+     * skema) tetap diterima — gambar unggahan desa justru berbentuk itu.
+     */
+    private const ALLOWED_SCHEMES = ['http', 'https', 'mailto', 'tel'];
+
     /** Tag yang masuk akal untuk isi surat resmi. */
     private const ALLOWED_TAGS = [
         'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'span', 'div',
@@ -51,7 +89,7 @@ final class HtmlSanitizer
         'table' => ['border'],
     ];
 
-    public function clean(string $html): string
+    public function clean(string $html, string $profile = self::PROFIL_SURAT): string
     {
         if (trim($html) === '') {
             return '';
@@ -81,7 +119,7 @@ final class HtmlSanitizer
             return '';
         }
 
-        $this->cleanNode($root);
+        $this->cleanNode($root, $profile);
 
         $output = '';
 
@@ -95,7 +133,7 @@ final class HtmlSanitizer
     /** Tag yang dibuang beserta ISINYA, bukan hanya tagnya. */
     private const STRIP_WITH_CONTENT = ['script', 'style', 'iframe', 'object', 'embed', 'template'];
 
-    private function cleanNode(DOMNode $node): void
+    private function cleanNode(DOMNode $node, string $profile): void
     {
         // Disalin lebih dulu: menghapus simpul saat menelusuri childNodes
         // membuat daftarnya bergeser dan sebagian anak terlewat.
@@ -118,7 +156,7 @@ final class HtmlSanitizer
                 continue;
             }
 
-            if (! in_array($tag, self::ALLOWED_TAGS, true)) {
+            if (! in_array($tag, $this->allowedTags($profile), true)) {
                 /*
                  * Tag tak dikenal dibuang tetapi ISINYA dipertahankan.
                  *
@@ -126,14 +164,27 @@ final class HtmlSanitizer
                  * seperti <font> atau <o:p>; membuang isinya berarti
                  * kalimat hilang dari surat tanpa penjelasan.
                  */
-                $this->cleanNode($child);
+                $this->cleanNode($child, $profile);
                 $this->unwrap($child);
 
                 continue;
             }
 
-            $this->stripAttributes($child, $tag);
-            $this->cleanNode($child);
+            if ($this->stripAttributes($child, $tag, $profile)) {
+                /*
+                 * Tautan atau gambar dengan URL berskema terlarang
+                 * (javascript:, data:) kehilangan seluruh gunanya; tagnya
+                 * dibuka agar teksnya tetap terbaca, bukan dibuang bersama
+                 * isinya — kalimat yang hilang tanpa penjelasan lebih
+                 * membingungkan petugas daripada tautan yang mati.
+                 */
+                $this->cleanNode($child, $profile);
+                $this->unwrap($child);
+
+                continue;
+            }
+
+            $this->cleanNode($child, $profile);
         }
     }
 
@@ -152,9 +203,10 @@ final class HtmlSanitizer
         $parent->removeChild($element);
     }
 
-    private function stripAttributes(DOMElement $element, string $tag): void
+    /** @return bool true bila elemen ini harus dibuka (URL-nya ditolak). */
+    private function stripAttributes(DOMElement $element, string $tag, string $profile): bool
     {
-        $allowed = self::ALLOWED_ATTRIBUTES[$tag] ?? [];
+        $allowed = $this->allowedAttributes($profile)[$tag] ?? [];
         $names = [];
 
         foreach ($element->attributes ?? [] as $attribute) {
@@ -166,6 +218,57 @@ final class HtmlSanitizer
                 $element->removeAttribute($name);
             }
         }
+
+        foreach (['href', 'src'] as $urlAttribute) {
+            if (! $element->hasAttribute($urlAttribute)) {
+                continue;
+            }
+
+            if (! $this->isSafeUrl($element->getAttribute($urlAttribute))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Apakah URL ini boleh dimuat peramban pembaca?
+     *
+     * Pemeriksaan dilakukan setelah seluruh spasi putih dibuang: `java\0script:`
+     * dan `java\tscript:` masih dijalankan sebagian peramban, dan keduanya
+     * lolos perbandingan apa adanya.
+     */
+    private function isSafeUrl(string $url): bool
+    {
+        $bersih = strtolower((string) preg_replace('/[\s\x00-\x1F]+/', '', $url));
+
+        if ($bersih === '') {
+            return false;
+        }
+
+        // Tanpa skema: URL relatif atau jangkar — selalu ke situs desa sendiri.
+        if (! preg_match('/^([a-z][a-z0-9+.-]*):/', $bersih, $cocok)) {
+            return true;
+        }
+
+        return in_array($cocok[1], self::ALLOWED_SCHEMES, true);
+    }
+
+    /** @return list<string> */
+    private function allowedTags(string $profile): array
+    {
+        return $profile === self::PROFIL_ARTIKEL
+            ? [...self::ALLOWED_TAGS, ...self::ARTICLE_TAGS]
+            : self::ALLOWED_TAGS;
+    }
+
+    /** @return array<string, list<string>> */
+    private function allowedAttributes(string $profile): array
+    {
+        return $profile === self::PROFIL_ARTIKEL
+            ? [...self::ALLOWED_ATTRIBUTES, ...self::ARTICLE_ATTRIBUTES]
+            : self::ALLOWED_ATTRIBUTES;
     }
 
     /**
@@ -175,9 +278,9 @@ final class HtmlSanitizer
      * membersihkan diam-diam: petugas yang menempel tabel dari Word dan
      * melihat hasilnya berubah tanpa penjelasan akan mengira sistemnya rusak.
      */
-    public function wouldChange(string $html): bool
+    public function wouldChange(string $html, string $profile = self::PROFIL_SURAT): bool
     {
-        return $this->normalize($this->clean($html)) !== $this->normalize($html);
+        return $this->normalize($this->clean($html, $profile)) !== $this->normalize($html);
     }
 
     private function normalize(string $html): string

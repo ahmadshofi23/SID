@@ -30,7 +30,7 @@ use SplFileInfo;
 final class RepositoryBoundaryTest extends TestCase
 {
     /** Model yang mewakili tabel dijaga (config/sid.php guarded_tables). */
-    private const GUARDED_MODELS = ['Resident', 'Family'];
+    private const GUARDED_MODELS = ['Resident', 'Family', 'Complaint'];
 
     /** Direktori yang DILARANG mengakses tabel dijaga secara langsung. */
     private const RESTRICTED_DIRS = [
@@ -164,8 +164,9 @@ final class RepositoryBoundaryTest extends TestCase
          * pada setiap dispatch.
          */
         $scopedTypes = [
-            'ResidentRepository', 'FamilyRepository',
-            'ResidentService', 'FamilyService', 'RegionService',
+            'ResidentRepository', 'FamilyRepository', 'ComplaintRepository',
+            'ResidentService', 'FamilyService', 'RegionService', 'ComplaintService',
+            'DashboardService',
             'AccessScope',
         ];
 

@@ -59,6 +59,14 @@ final class PermissionSeeder extends Seeder
             'pengaduan.tindaklanjut' => 'Menindaklanjuti pengaduan',
         ],
         'portal' => [
+            /*
+             * TIGA izin, bukan dua — matriks RBAC docs/03 §4.9 memberi Kepala
+             * Desa "R,A" atas konten portal: ia menyetujui terbit tetapi tidak
+             * menyunting. Tanpa `portal.lihat` yang berdiri sendiri, satu-
+             * satunya cara ia dapat membuka daftar konten adalah diberi izin
+             * menyunting juga — yang menghapus pemisahan kewenangan itu.
+             */
+            'portal.lihat' => 'Melihat konten portal',
             'portal.kelola' => 'Mengelola konten portal',
             'portal.terbitkan' => 'Menerbitkan konten portal',
         ],

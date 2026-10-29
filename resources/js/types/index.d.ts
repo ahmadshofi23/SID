@@ -14,6 +14,8 @@ export interface AuthUser {
     role_labels: string[]
     permissions: string[]
     region_limited: boolean
+    /** Lingkupnya keluarga sendiri (warga) — antrean petugas disembunyikan. */
+    family_limited: boolean
     region_assigned: boolean
     two_factor_enabled: boolean
 }
@@ -29,7 +31,20 @@ export interface PageProps {
     auth: { user: AuthUser | null }
     flash: FlashMessages
     errors: Record<string, string>
+    /** Jumlah notifikasi belum dibaca untuk lonceng (FR-SRT-14). */
+    notifikasi_belum_dibaca: number
     [key: string]: unknown
+}
+
+export interface NotifikasiRow {
+    id: string
+    kategori: string
+    judul: string
+    isi: string
+    tiket: string | null
+    nomor_surat: string | null
+    dibaca: boolean
+    created_at: string | null
 }
 
 export interface Region {
@@ -246,6 +261,19 @@ export interface LetterRequestTracking {
     issued_at: string | null
 }
 
+/**
+ * Pengajuan milik akun warga sendiri — dibangun di atas LetterRequestTracking
+ * (lihat LetterRequestPresenter::forCitizen). Nama pemohon di sini TIDAK
+ * tersamar: pembukanya sudah masuk sebagai anggota keluarga itu.
+ */
+export interface LetterRequestForCitizen extends Omit<LetterRequestTracking, 'resident_name'> {
+    id: string
+    resident_name: string
+    purpose: string | null
+    /** Null bila surat belum terbit atau sudah dibatalkan (RULE-05). */
+    letter_id: string | null
+}
+
 export interface LetterRequestRow {
     id: string
     ticket_number: string
@@ -310,4 +338,232 @@ export interface LetterRequestDetail extends LetterRequestRow {
     step_role_labels: string[]
     logs: LetterRequestLog[]
     letter: IssuedLetter | null
+}
+
+/* ======================== Pengaduan (Sprint 7) ========================= */
+
+export type ComplaintStatus = 'baru' | 'diterima' | 'diproses' | 'selesai' | 'ditolak'
+
+export interface ComplaintStep {
+    id: string
+    to_label: string | null
+    note: string
+    /** Sudah diformat server pada kalender desa — jangan diformat ulang. */
+    at: string
+}
+
+/**
+ * Pelacakan pengaduan dengan kode — FR-PGD-02.
+ *
+ * Tidak memuat identitas pelapor dan tidak memuat nama petugas: halaman ini
+ * terbuka bagi siapa pun yang memegang kodenya, dan menyebut petugas yang
+ * menangani pengaduan tentang perangkat desa justru dapat membahayakan orang.
+ */
+export interface ComplaintTracking {
+    ticket_number: string
+    status: ComplaintStatus
+    status_label: string
+    category: string
+    title: string
+    is_open: boolean
+    is_overdue: boolean
+    created_at: string | null
+    due_at: string | null
+    resolved_at: string | null
+    resolution: string | null
+    timeline: ComplaintStep[]
+}
+
+/** Pengaduan milik akun warga sendiri — portal warga. */
+export interface ComplaintForCitizen extends ComplaintTracking {
+    id: string
+    location_text: string | null
+}
+
+/**
+ * Tanda terima pengaduan — muncul SATU KALI, tepat setelah dikirim.
+ *
+ * `tracking_code` tidak dapat dibuka kembali: ia tidak pernah ikut ke payload
+ * mana pun selain ini (lihat ComplaintPresenter).
+ */
+export interface ComplaintReceipt {
+    ticket_number: string
+    tracking_code: string
+    is_anonymous: boolean
+    title: string
+    triage_due_at: string | null
+}
+
+/** Baris antrean pengaduan untuk petugas — UC-14. */
+export interface ComplaintRow {
+    id: string
+    ticket_number: string
+    status: ComplaintStatus
+    status_label: string
+    priority: 'rendah' | 'normal' | 'tinggi'
+    priority_label: string
+    category: string
+    title: string
+    is_anonymous: boolean
+    /** "Anonim" bila anonim — jangan diganti string kosong. */
+    reporter_label: string
+    region: string | null
+    location_text: string | null
+    assignee: string | null
+    assigned_to: string | null
+    is_open: boolean
+    is_overdue: boolean
+    created_at: string | null
+    due_at: string | null
+    /** Disusun server pada kalender desa — jangan dihitung ulang di peramban. */
+    due_label: string | null
+}
+
+export interface ComplaintOfficerStep extends ComplaintStep {
+    actor_name: string | null
+    /** Catatan internal (false) tidak pernah dibaca pelapor. */
+    is_visible_to_reporter: boolean
+}
+
+/**
+ * Detail pengaduan untuk petugas.
+ *
+ * `tracking_code` TIDAK ada di sini dan tidak boleh ditambahkan: ia rahasia
+ * milik pelapor, bukan milik desa.
+ */
+export interface ComplaintDetail extends ComplaintRow {
+    body: string
+    reporter_phone: string | null
+    latitude: string | null
+    longitude: string | null
+    region_path: string | null
+    triage_due_at: string | null
+    assigned_at: string | null
+    is_published: boolean
+    allowed_transitions: ComplaintStatus[]
+    timeline: ComplaintOfficerStep[]
+}
+
+/* ======================== Dashboard (Sprint 7) ========================= */
+
+export interface DashboardPopulation {
+    penduduk_aktif: number
+    penduduk_total: number
+    /** Null bila pengguna tidak berhak melihat kartu keluarga. */
+    keluarga: number | null
+    perubahan_bulan_ini: number | null
+}
+
+export interface DashboardLetters {
+    terbuka: number
+    terbit: number
+    terlambat: number
+}
+
+export interface DashboardComplaints {
+    terbuka: number
+    selesai: number
+    terlambat: number
+}
+
+export interface DashboardTrendMonth {
+    bulan: string
+    /** Sudah diformat server pada kalender desa, mis. "Okt 26". */
+    label: string
+    masuk: number
+    selesai: number
+}
+
+export interface DashboardSla {
+    total: number
+    rata_jam: number | null
+    tepat_waktu: number
+    persen_tepat: number | null
+}
+
+export interface DashboardTask {
+    id: string
+    ticket_number: string
+    letter_type: string
+    resident_name: string
+    status: LetterRequestStatus
+    status_label: string
+    is_overdue: boolean
+    submitted_at: string | null
+}
+
+/**
+ * Setiap bagian `null` berarti pengguna TIDAK BERHAK melihatnya — bukan nol.
+ * Layar menyembunyikan kartunya; menampilkannya bernilai nol akan menyatakan
+ * sesuatu yang salah, dan di dashboard pimpinan itu berakhir sebagai keputusan.
+ */
+export interface DashboardProps {
+    kependudukan: DashboardPopulation | null
+    layanan: DashboardLetters | null
+    pengaduan: DashboardComplaints | null
+    tren: { bulanan: DashboardTrendMonth[]; sla: DashboardSla } | null
+    perlu_tindakan: DashboardTask[] | null
+    pengaduan_terbuka: ComplaintRow[] | null
+    komposisi: {
+        total: number
+        piramida: { group: string; L: number | string; P: number | string }[]
+        computed_at: string | null
+    } | null
+}
+
+/* ======================== Laporan (Sprint 7) =========================== */
+
+export interface ReportCategoryRow {
+    kode: string
+    label: string
+    jumlah: number
+}
+
+export interface ReportRegionRow {
+    region: string
+    total: number
+    laki: number
+    perempuan: number
+}
+
+export interface ReportServiceRow {
+    code: string
+    name: string
+    total: number
+    selesai: number
+    ditolak: number
+    /** Null bila belum ada satu pun surat selesai — bukan nol. */
+    rata_jam: number | null
+    persen_tepat: number | null
+}
+
+export interface ReportProps {
+    penduduk: {
+        total: number
+        per_wilayah: ReportRegionRow[]
+        per_kategori: Record<string, ReportCategoryRow[]>
+    }
+    mutasi: {
+        dari: string
+        sampai: string
+        total: number
+        per_jenis: ReportCategoryRow[]
+    }
+    layanan: {
+        dari: string
+        sampai: string
+        per_jenis: ReportServiceRow[]
+        sla: DashboardSla
+        tren: DashboardTrendMonth[]
+    }
+    pengaduan: {
+        total: number
+        terbuka: number
+        terlambat: number
+        per_status: ReportCategoryRow[]
+    } | null
+    periode: { dari: string; sampai: string }
+    /** Keterangan lingkup data — wajib ditampilkan, lihat ReportController. */
+    lingkup: string
+    izin: { ekspor: boolean; nik_penuh: boolean }
 }

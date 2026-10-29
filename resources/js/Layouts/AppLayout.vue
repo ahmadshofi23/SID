@@ -4,15 +4,29 @@ import { Link, router } from '@inertiajs/vue3'
 import {
     LayoutDashboard, Users, House, Map, ScrollText, ArrowRightLeft,
     ChartColumn, ShieldAlert, Upload, Mail, FileCheck, Archive, Settings2,
-    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search,
+    Menu, X, Sun, Moon, LogOut, ShieldCheck, Landmark, Search, Newspaper, Globe, UserCheck,
+    Megaphone, FileText,
 } from '@lucide/vue'
 import { usePageData } from '@/composables/usePage'
 import { useTheme } from '@/composables/useTheme'
 import FlashMessages from '@/Components/FlashMessages.vue'
+import NotificationBell from '@/Components/NotificationBell.vue'
 
 defineProps<{ title?: string }>()
 
 const { user, village, can } = usePageData()
+
+/*
+ * Antrean PETUGAS disembunyikan dari warga.
+ *
+ * Warga memegang `surat.lihat` dan `pengaduan.lihat` (matriks RBAC memberinya
+ * "C,R*"), sehingga `can()` saja tetap menampilkan menu antrean kepadanya —
+ * padahal sejak Sprint 7 rutenya dijaga middleware `petugas` dan akan
+ * menolaknya. Menu yang menuntun ke penolakan lebih buruk daripada menu yang
+ * tidak ada: ia membuat orang menyimpulkan sistemnya rusak (KEP-012).
+ */
+const staf = (permission: string): boolean =>
+    can(permission) && !user.value?.family_limited
 const { theme, toggle: toggleTheme } = useTheme()
 
 const mobileNavOpen = ref(false)
@@ -77,11 +91,11 @@ const groups = computed<NavGroup[]>(() => [
         label: 'Persuratan',
         items: [
             { label: 'Antrean Surat', route: '/surat',
-              pattern: '/surat', icon: Mail, show: can('surat.lihat') },
+              pattern: '/surat', icon: Mail, show: staf('surat.lihat') },
             { label: 'Ajukan Surat', route: '/surat/ajukan',
-              pattern: '/surat/ajukan', icon: FileCheck, show: can('surat.ajukan') },
+              pattern: '/surat/ajukan', icon: FileCheck, show: staf('surat.ajukan') },
             { label: 'Arsip Surat', route: '/surat/arsip',
-              pattern: '/surat/arsip', icon: Archive, show: can('surat.lihat') },
+              pattern: '/surat/arsip', icon: Archive, show: staf('surat.lihat') },
             /*
              * Halaman warga, sengaja ikut di menu petugas.
              *
@@ -96,14 +110,52 @@ const groups = computed<NavGroup[]>(() => [
              * menyediakan tautan kembali ke dasbor bagi yang sudah masuk.
              */
             { label: 'Lacak Pengajuan', route: '/surat/lacak',
-              pattern: '/surat/lacak', icon: Search, show: can('surat.lihat') },
+              pattern: '/surat/lacak', icon: Search, show: staf('surat.lihat') },
             { label: 'Jenis Surat', route: '/jenis-surat',
-              pattern: '/jenis-surat', icon: Settings2, show: can('jenis_surat.lihat') },
+              pattern: '/jenis-surat', icon: Settings2, show: staf('jenis_surat.lihat') },
+        ],
+    },
+    {
+        /*
+         * Kelompok sendiri, bukan diselipkan di bawah "Persuratan": keduanya
+         * sama-sama antrean pekerjaan, tetapi pemegang izinnya berbeda —
+         * Kasi Kesejahteraan menindaklanjuti pengaduan tanpa menyentuh surat.
+         * Menaruhnya di kelompok persuratan membuat kelompok itu muncul utuh
+         * bagi orang yang tidak punya satu pun izin surat.
+         */
+        label: 'Pengaduan',
+        items: [
+            { label: 'Antrean Pengaduan', route: '/pengaduan/antrean',
+              pattern: '/pengaduan/antrean', icon: Megaphone, show: staf('pengaduan.lihat') },
+        ],
+    },
+    {
+        label: 'Portal Desa',
+        items: [
+            { label: 'Konten Portal', route: '/portal/konten',
+              pattern: '/portal/konten', icon: Newspaper, show: can('portal.lihat') },
+            /*
+             * Tautan ke portal publik, sengaja ada di menu petugas: yang
+             * menulis berita harus dapat melihat hasilnya seperti yang dilihat
+             * warga, bukan hanya pratinjau di dalam panel.
+             */
+            { label: 'Lihat Portal Publik', route: '/',
+              pattern: '/portal-publik', icon: Globe, show: can('portal.lihat') },
+        ],
+    },
+    {
+        label: 'Laporan',
+        items: [
+            { label: 'Laporan & Ekspor', route: '/laporan',
+              pattern: '/laporan', icon: FileText, show: can('laporan.lihat') },
         ],
     },
     {
         label: 'Pengaturan',
         items: [
+            { label: 'Verifikasi Warga', route: '/pengaturan/verifikasi-warga',
+              pattern: '/pengaturan/verifikasi-warga', icon: UserCheck,
+              show: can('pengguna.verifikasi') },
             { label: 'Log Aktivitas', route: '/pengaturan/log-aktivitas',
               pattern: '/pengaturan/log-aktivitas', icon: ScrollText, show: can('audit.lihat') },
         ],
@@ -187,6 +239,8 @@ function logout(): void {
                 </Link>
 
                 <div class="ml-auto flex items-center gap-1">
+                    <NotificationBell />
+
                     <button
                         type="button"
                         class="flex size-10 items-center justify-center rounded-lg text-content-secondary

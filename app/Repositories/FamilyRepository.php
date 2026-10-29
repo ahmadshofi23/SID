@@ -70,6 +70,26 @@ final class FamilyRepository extends GuardedRepository
     }
 
     /**
+     * Jumlah kartu keluarga SE-DESA, mengabaikan lingkup akses.
+     *
+     * Khusus untuk angka "… keluarga" di portal publik (docs/07 §5.5, BR-21).
+     * Dipakai countAll() yang berlingkup, pengunjung anonim — yang tidak punya
+     * AccessScope sama sekali — akan melihat angka 0, dan desa menerbitkan
+     * jumlah keluarga yang salah di halaman depannya sendiri.
+     *
+     * AMAN karena yang keluar dari sini SATU BILANGAN untuk seluruh desa,
+     * bukan baris: tidak ada nomor KK, alamat, atau anggota keluarga yang
+     * dapat diturunkan darinya. Itulah batasnya — begitu metode ini perlu
+     * mengembalikan baris, atau angka per wilayah yang dapat dipersempit
+     * sampai satu keluarga, ia bukan lagi agregat dan tidak boleh melewati
+     * lingkup akses.
+     */
+    public function countAllIgnoringScope(): int
+    {
+        return Family::query()->count();
+    }
+
+    /**
      * Daftar kartu keluarga dengan pencarian & filter.
      *
      * @param  array<string, mixed>  $filters

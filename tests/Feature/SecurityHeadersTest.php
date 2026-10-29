@@ -65,12 +65,29 @@ final class SecurityHeadersTest extends TestCase
     }
 
     #[Test]
-    #[TestDox('Halaman depan dirender dengan komponen alert')]
-    public function halaman_depan_dirender(): void
+    #[TestDox('Skrip sebaris di halaman depan menyandang nonce yang sama dengan header CSP')]
+    public function skrip_sebaris_halaman_depan_bernonce(): void
     {
-        $this->get('/')
-            ->assertOk()
-            ->assertSee('Portal publik dibangun pada Sprint 6')
-            ->assertSee('role="status"', false);
+        /*
+         * Halaman depan adalah portal publik (KEP-016) dan memuat dua skrip
+         * sebaris: pencegah kedipan putih mode gelap, dan data terstruktur
+         * JSON-LD. Keduanya hanya berjalan bila nonce-nya cocok dengan
+         * direktif script-src pada permintaan ITU.
+         *
+         * MENGAPA DIUJI DI SINI, BUKAN DIANGGAP JELAS: ketidakcocokan antara
+         * keduanya tidak menghasilkan galat apa pun selain di konsol peramban.
+         * Akibatnya baru terlihat sebagai mode gelap yang berkedip putih dan
+         * cuplikan hasil pencarian yang hilang — gejala yang tak seorang pun
+         * menghubungkan dengan CSP.
+         */
+        $response = $this->get('/')->assertOk();
+
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+
+        $this->assertSame(1, preg_match("/'nonce-([^']+)'/", $csp, $cocok),
+            'Header CSP halaman depan tidak memuat nonce.');
+
+        $response->assertSee('nonce="'.$cocok[1].'"', false);
+        $response->assertSee('application/ld+json', false);
     }
 }

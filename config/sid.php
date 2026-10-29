@@ -84,4 +84,22 @@ return [
 
     // Penyamaran sel kecil pada statistik publik — ADR-008
     'stats_small_cell_threshold' => 5,
+
+    /*
+    | Pengaduan — FR-PGD-08.
+    |
+    | Hanya batas TEKNIS yang ada di sini. Batas waktu SLA-nya (triase 2 hari,
+    | selesai 14 hari kerja) adalah aturan bisnis yang boleh berbeda per desa,
+    | jadi ia dibaca dari tabel `settings` dengan kunci
+    | `complaint.triage_sla_days` dan `complaint.resolution_sla_days` —
+    | lihat ComplaintService.
+    |
+    | Batas per IP longgar dengan sengaja: satu keluarga di balik satu
+    | sambungan desa dapat melapor beberapa kali sehari, dan memblokir mereka
+    | jauh lebih merugikan daripada menerima beberapa pengaduan berlebih.
+    */
+    'complaints' => [
+        'max_per_ip_per_day' => (int) env('COMPLAINT_MAX_PER_IP_PER_DAY', 10),
+        'body_max_length' => 5000,
+    ],
 ];

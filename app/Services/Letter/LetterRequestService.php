@@ -43,6 +43,7 @@ final class LetterRequestService
         private readonly LetterContextBuilder $context,
         private readonly DynamicFormValidator $forms,
         private readonly MutationOfferService $mutationOffers,
+        private readonly LetterNotifier $notifier,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -62,6 +63,7 @@ final class LetterRequestService
         array $formInput,
         string $channel = 'online',
         bool $submit = true,
+        bool $allowDuplicate = false,
     ): LetterRequest {
         if (! $type->is_active) {
             throw ValidationException::withMessages([
@@ -86,7 +88,20 @@ final class LetterRequestService
 
         $existing = $this->requests->openRequestFor($resident->id, $type->id);
 
-        if ($existing !== null) {
+        /*
+         * Pengajuan kembar DIHALANGI secara bawaan, tetapi tidak dilarang.
+         *
+         * UC-05 alur 7b meminta sistem MEMPERINGATKAN dan meminta konfirmasi,
+         * bukan memblokir: alasan sah untuk mengajukan surat sejenis dua kali
+         * memang ada (satu untuk sekolah, satu untuk bank, masing-masing
+         * perlu lembar asli). Karena itu $allowDuplicate ada — jalur daring
+         * memanggilnya `true` setelah warga menekan "Ya, tetap ajukan".
+         *
+         * Bawaannya tetap `false` sehingga perilaku loket tidak berubah:
+         * petugas yang tidak sengaja membuat pengajuan kedua untuk warga yang
+         * sama tetap dihentikan dan diberi tahu nomor tiket yang berjalan.
+         */
+        if ($existing !== null && ! $allowDuplicate) {
             throw ValidationException::withMessages([
                 'resident_id' => 'Pemohon masih memiliki pengajuan '.$type->name
                     .' yang sedang diproses (tiket '.$existing->ticket_number.').',
@@ -368,6 +383,13 @@ final class LetterRequestService
      * sudah dicatat pihak lain; memakainya kembali akan menghasilkan dua
      * dokumen berbeda dengan nomor sama.
      */
+    /**
+     * Pembatalan surat terbit — RULE-05, FR-SRT-12.
+     *
+     * Tidak melewati transition(): status PENGAJUAN tetap `diterbitkan`, yang
+     * berubah adalah keabsahan suratnya. Karena itu notifikasinya dipanggil
+     * di sini, terpisah, dengan kelas notifikasi tersendiri.
+     */
     public function cancelLetter(Letter $letter, string $reason, ?string $actorId): Letter
     {
         if (trim($reason) === '') {
@@ -388,6 +410,8 @@ final class LetterRequestService
             'nomor_surat' => $letter->letter_number,
             'alasan' => $reason,
         ]);
+
+        $this->notifier->letterCancelled($letter, $reason);
 
         return $letter;
     }
@@ -538,6 +562,29 @@ final class LetterRequestService
 
             if ($from !== $to || $forceLog) {
                 $this->writeLog($request, $from, $to, $note);
+
+                /*
+                 * SATU-SATUNYA tempat notifikasi status dikirim (FR-SRT-14).
+                 *
+                 * Seluruh perubahan status melewati transition(), jadi
+                 * memasangnya di sini berarti tidak ada jalur yang dapat
+                 * mengubah status tanpa memberi tahu pemohonnya — termasuk
+                 * jalur yang ditambahkan nanti oleh orang yang tidak tahu
+                 * notifikasi ini ada.
+                 *
+                 * Pembuatan DRAF tidak lewat sini (ia memanggil writeLog()
+                 * langsung), dan memang tidak boleh: draf belum berarti
+                 * apa-apa bagi warga.
+                 *
+                 * Dikirim DI DALAM transaksi dengan sengaja: notifikasi yang
+                 * terkirim untuk transisi yang kemudian dibatalkan rollback
+                 * jauh lebih buruk daripada notifikasi yang tidak terkirim.
+                 */
+                $this->notifier->statusChanged($request, (string) $from);
+
+                if ($to === LetterRequest::STATUS_SUBMITTED) {
+                    $this->notifier->awaitingAction($request);
+                }
             }
 
             return $request->refresh();

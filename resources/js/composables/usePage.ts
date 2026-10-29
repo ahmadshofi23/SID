@@ -9,6 +9,7 @@ export function usePageData() {
     const user = computed(() => page.props.auth.user)
     const village = computed(() => page.props.village)
     const flash = computed(() => page.props.flash)
+    const unreadNotifications = computed(() => page.props.notifikasi_belum_dibaca ?? 0)
 
     /**
      * Pemeriksaan izin untuk MENYEMBUNYIKAN menu & tombol.
@@ -28,5 +29,5 @@ export function usePageData() {
         return permissions.some(can)
     }
 
-    return { page, user, village, flash, can, canAny }
+    return { page, user, village, flash, unreadNotifications, can, canAny }
 }

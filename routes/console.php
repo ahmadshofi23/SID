@@ -42,3 +42,21 @@ Schedule::command('sid:prune-import-files')
     ->dailyAt('02:30')
     ->name('bersihkan-berkas-impor')
     ->withoutOverlapping();
+
+/*
+ * Eskalasi pengaduan yang melewati SLA — FR-PGD-06.
+ *
+ * Pagi hari kerja, satu kali: notifikasi eskalasi yang datang tengah malam
+ * akan terkubur di bawah notifikasi lain sebelum ada yang membukanya, dan
+ * yang dua kali sehari hanya mengajarkan orang mengabaikannya.
+ *
+ * Perintah ini TIDAK menentukan apakah sebuah pengaduan terlambat — itu
+ * selalu dihitung dari kueri. Lihat keterangan panjangnya pada
+ * App\Console\Commands\EscalateComplaints.
+ */
+Schedule::command('sid:eskalasi-pengaduan')
+    ->weekdays()
+    ->dailyAt('07:30')
+    ->timezone(config('sid.timezone'))
+    ->name('eskalasi-pengaduan')
+    ->withoutOverlapping();

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
@@ -26,6 +27,11 @@ use Illuminate\Support\Str;
  * @property int $failed_login_count
  * @property Carbon|null $locked_until
  * @property Carbon|null $two_factor_confirmed_at
+ * @property string|null $verification_method
+ * @property string|null $verification_document_path
+ * @property string|null $verified_by
+ * @property Carbon|null $verified_at
+ * @property string|null $verification_note
  * @property mixed $two_factor_secret
  * @property mixed $two_factor_recovery_codes
  * @property-read Resident|null $resident
@@ -33,7 +39,7 @@ use Illuminate\Support\Str;
  */
 final class User extends Authenticatable implements AuthenticatableContract
 {
-    use HasUuids, SoftDeletes;
+    use HasUuids, Notifiable, SoftDeletes;
 
     protected $keyType = 'string';
 
