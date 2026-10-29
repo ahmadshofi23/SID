@@ -567,3 +567,36 @@ export interface ReportProps {
     lingkup: string
     izin: { ekspor: boolean; nik_penuh: boolean }
 }
+
+/* =========================== Log Aktivitas =========================== */
+
+export interface AuditLogRow {
+    id: number
+    action: string
+    actor_id: string | null
+    /** "sistem" bila tanpa pengguna; null hanya pada baris RULE-09. */
+    actor_name: string | null
+    actor_roles: string | null
+    entity_type: string | null
+    entity_id: string | null
+    changes: Record<string, unknown> | null
+    context: Record<string, unknown> | null
+    /**
+     * Apa adanya. Baris yang dicatat tanpa pelaku tidak pernah membawa
+     * alamat — ditutup saat penulisan, lihat AuditLogPresenter dan KEP-021.
+     */
+    ip_address: string | null
+    user_agent: string | null
+    correlation_id: string | null
+    hash_version: number
+    created_at: string | null
+}
+
+export interface AuditLogFilters {
+    action: string
+    actor_id: string
+    entity_type: string
+    entity_id: string
+    from: string
+    to: string
+}
