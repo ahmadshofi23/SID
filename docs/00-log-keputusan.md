@@ -102,7 +102,7 @@ adalah pekerjaan konfigurasi (± 0,5 hari-orang/template), bukan pengembangan.
 
 | Lapis | Pilihan |
 |-------|---------|
-| Backend | PHP 8.3+ + **Laravel 13** (naik dari rencana Laravel 11 — lihat 14 §4) |
+| Backend | PHP 8.4+ + **Laravel 13** (naik dari rencana Laravel 11 — lihat 14 §4; batas PHP naik ke 8.4 karena komponen Symfony 8 menuntut `>= 8.4.1`) |
 | Basis data | **MySQL 8.0** (KEP-002) |
 | Panel admin | Inertia.js + React + TypeScript + Tailwind (mulai Sprint 2) |
 | Portal publik | Blade (SSR) |

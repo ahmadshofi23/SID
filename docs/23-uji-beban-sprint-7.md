@@ -92,7 +92,7 @@ dikutip kembali setahun kemudian sebagai janji.
 | | Mesin uji | Produksi (docs/10) |
 |---|---|---|
 | Perangkat | Apple M1, 8 inti, 16 GB | VPS 2–4 vCPU |
-| PHP | 8.5.6, server bawaan PHP, 32 pekerja (lihat §6.1) | 8.3+, php-fpm di belakang Nginx |
+| PHP | 8.5.6, server bawaan PHP, 32 pekerja (lihat §6.1) | 8.4+, php-fpm di belakang Nginx |
 | MySQL | 8.4.11, buffer pool 4 GB | 8.0+, buffer pool lebih kecil |
 | Jaringan | localhost | internet, TLS |
 | Cache | `array` (lihat di bawah) | Redis |
