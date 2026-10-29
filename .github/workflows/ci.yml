@@ -134,6 +134,27 @@ jobs:
           DB_PASSWORD: root
         run: php artisan migrate --force
 
+      # Lima penyemai, BUKAN `db:seed` penuh.
+      #
+      # Tanpa langkah ini tabel izin kosong sejak awal, dan RouteSweepTest —
+      # gerbang rilis docs/09 §4.3 — melaporkan SELURUH rute merujuk izin
+      # "yang tidak terdaftar". Gerbang yang selalu merah karena lingkungannya
+      # tidak menguji apa pun.
+      #
+      # `db:seed` penuh TIDAK dipakai: DemoDataSeeder menulis data contoh yang
+      # membuat sekitar dua puluh uji lain gagal karena jumlah barisnya tidak
+      # lagi seperti yang diharapkan.
+      - name: Semai data fondasi (izin, peran, wilayah, jenis surat)
+        env:
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: sid_desa_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: |
+          for seeder in ReferenceSeeder PermissionSeeder RoleSeeder VillageSeeder LetterTypeSeeder; do
+            php artisan db:seed --class="$seeder" --force
+          done
+
       # --------------------------------------------------------------------
       # Lapis WAJIB. Tanpa Row-Level Security (MySQL, KEP-002), dua tahap
       # berikut adalah satu-satunya verifikasi otomatis bahwa pembatasan

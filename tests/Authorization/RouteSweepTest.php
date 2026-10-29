@@ -6,6 +6,7 @@ namespace Tests\Authorization;
 
 use App\Models\Permission;
 use App\Models\Role;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Facades\Route;
@@ -40,6 +41,40 @@ use Tests\TestCase;
 final class RouteSweepTest extends TestCase
 {
     use DatabaseTransactions;
+
+    /**
+     * Izin disemai oleh uji ini SENDIRI, dan itu bukan kehati-hatian
+     * berlebihan.
+     *
+     * Uji ini membandingkan izin yang dirujuk rute dengan isi tabel
+     * `permissions`. Sebelumnya ia mengandalkan tabel itu SUDAH terisi dari
+     * luar — dan isinya dihapus oleh uji lain yang memakai `RefreshDatabase`
+     * (LetterNumberingConcurrencyTest, ReportRecapQueryTest,
+     * AuditChainConcurrencyTest, VolumeSeederTest). Akibatnya uji ini lulus
+     * atau gagal menurut APA YANG DIJALANKAN SEBELUMNYA:
+     *
+     *   - satu jalan penuh berurutan: lulus, karena suite Authorization
+     *     berjalan sebelum suite Feature;
+     *   - jalan BERIKUTNYA pada basis data yang sama: gagal, dengan daftar
+     *     delapan puluh sembilan rute yang terbaca persis seperti kerusakan
+     *     otorisasi yang nyata;
+     *   - di CI, pada tahap cakupan yang menjalankan ulang seluruh suite
+     *     setelah tahap Unit/Feature: gagal, selalu.
+     *
+     * Gerbang rilis (docs/09 §4.3) yang hasilnya bergantung pada urutan
+     * bukanlah gerbang. Menyemai di sini membuat uji ini menjawab satu
+     * pertanyaan saja — apakah setiap izin yang dirujuk rute benar-benar
+     * terdaftar — tanpa meminjam keadaan dari siapa pun.
+     *
+     * Penyemaiannya ikut dibatalkan bersama transaksi uji, jadi ia tidak
+     * meninggalkan apa pun untuk uji berikutnya.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(PermissionSeeder::class);
+    }
 
     /**
      * Rute ber-otentikasi yang memang TIDAK memakai izin granular, beserta
