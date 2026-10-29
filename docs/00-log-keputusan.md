@@ -770,10 +770,11 @@ dan andalkan middleware `throttle` saja; (f) simpan sidik jari ber-kunci.
    dan tidak ada satu angka pun di layar yang menjadi salah karenanya. Pola
    yang sama dengan penjadwalan terbit konten portal (Sprint 6).
 
-**Konsekuensi yang diterima:** docs/05 §3.5 tidak lagi menggambarkan tabel
-`complaints` secara persis — dua kolomnya berbeda. Dokumen model data harus
-diperbarui pada penyelarasan berikutnya; sampai itu terjadi, entri ini adalah
-sumber kebenarannya. Satu kolom tambahan juga berarti satu indeks tambahan
+**Konsekuensi yang diterima:** docs/05 §3.5 **sudah diselaraskan**
+(2026-10-29): DDL-nya menuliskan `triage_due_at` dan `submitted_ip_hash`
+beserta `idx_complaints_triage_due`, dan alasan keduanya ikut pindah ke sana —
+dokumen model data kembali menjadi sumber kebenaran skema. Satu kolom tambahan
+juga berarti satu indeks tambahan
 (`idx_complaints_triage_due`), yang dibayar pada setiap penyisipan pengaduan —
 jumlah yang kecil dibanding nilai angka ketepatan triase.
 

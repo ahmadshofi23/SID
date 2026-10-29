@@ -723,11 +723,15 @@ CREATE TABLE complaints (
     priority ENUM('rendah','normal','tinggi') NOT NULL DEFAULT 'normal',
     assigned_to   CHAR(36) NULL,
     assigned_at   DATETIME NULL,
+    -- DUA kolom tenggat, bukan satu (KEP-018). triage_due_at diisi sekali
+    -- saat pengaduan masuk dan tidak pernah diubah lagi; due_at diisi saat
+    -- triase. Lihat catatan di bawah blok ini.
+    triage_due_at DATETIME NULL,
     due_at        DATETIME NULL,
     resolved_at   DATETIME NULL,
     resolution    TEXT NULL,
     is_published  TINYINT(1) NOT NULL DEFAULT 0,
-    submitted_ip  VARCHAR(45) NULL,
+    submitted_ip_hash CHAR(64) NULL,            -- HMAC-SHA256 ber-pepper (KEP-018)
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_complaints_ticket   (ticket_number),
@@ -735,6 +739,7 @@ CREATE TABLE complaints (
     KEY idx_complaints_status   (status, created_at),
     KEY idx_complaints_assigned (assigned_to, status),
     KEY idx_complaints_due      (status, due_at),
+    KEY idx_complaints_triage_due (status, triage_due_at),
     KEY idx_complaints_reporter (reporter_user_id),
     CONSTRAINT chk_complaints_anon CHECK (
         is_anonymous = 0
@@ -759,6 +764,52 @@ CREATE TABLE complaint_actions (
 ```
 > `chk_complaints_anon` menegakkan RULE-09 di tingkat basis data: pengaduan anonim
 > **tidak dapat** menyimpan identitas pelapor, bahkan bila kode aplikasi keliru.
+
+> **Mengapa ada DUA kolom tenggat (KEP-018).** FR-PGD-06 menetapkan dua batas
+> yang berjalan berurutan: triase 2 hari dan penyelesaian 14 hari kerja. Satu
+> kolom memang cukup untuk menampilkan "terlambat" hari ini — maknanya tinggal
+> berpindah mengikuti status — tetapi ia **menimpa** angka tenggat triase
+> begitu pengaduan ditriase. Akibatnya pertanyaan "berapa persen pengaduan
+> ditriase tepat waktu" hanya dapat dijawab untuk pengaduan yang **belum**
+> ditangani, yaitu justru yang belum punya hasil. Ketepatan triase adalah
+> satu-satunya angka yang menunjukkan apakah pengaduan warga dibaca orang, dan
+> ia hilang tepat ketika pengaduannya selesai.
+>
+> `triage_due_at` karena itu diisi **sekali** saat pengaduan masuk dan tidak
+> pernah diubah lagi — yang membuatnya berguna justru keabadiannya. `due_at`
+> diisi saat triase, dan dihitung **dari saat triase**, bukan dari saat
+> pengaduan masuk: pengaduan yang didiamkan sepuluh hari lalu baru ditriase
+> tidak lantas tersisa empat hari, karena itu menghukum petugas yang akhirnya
+> menanganinya dan menyembunyikan keterlambatan yang sebenarnya terjadi di
+> tahap triase. `Complaint::activeDueAt()` yang memutuskan mana yang sedang
+> ditunggu. Batas harinya sendiri dibaca dari `settings`
+> (`complaint.triage_sla_days`, `complaint.resolution_sla_days`), bukan
+> ditanam di kode — supaya ia dapat disepakati bersama perangkat desa, bukan
+> diasumsikan.
+
+> **Mengapa sidik jari IP, bukan alamatnya (KEP-018).** FR-PGD-08 menuntut
+> pembatasan laju per IP. Alamat mentah di tabel ini dapat **di-JOIN** dengan
+> `audit_logs.ip_address`, yang dicatat setiap kali seseorang masuk: pengaduan
+> anonim tentang pungutan liar menjadi bernama kembali lewat dua kueri, oleh
+> orang yang berhak membaca audit log — yaitu Admin Desa, yang justru paling
+> sering menjadi pihak yang diadukan. `chk_complaints_anon` tidak menolong
+> sama sekali, karena kolom itu memang tidak dilarangnya.
+>
+> Yang dibutuhkan FR-PGD-08 hanyalah perbandingan sama-tidak-sama, dan itu
+> dapat dijawab tanpa pernah menyimpan alamatnya. **HMAC ber-pepper
+> (`PiiCipher`), bukan hash biasa**, dengan alasan yang sama seperti NIK:
+> ruang IPv4 hanya 4 miliar nilai, sehingga tabel pelanginya dapat dibangun
+> dalam hitungan menit dan hash biasa tidak melindungi apa pun bila basis data
+> bocor.
+>
+> Konsekuensi yang disengaja: `submitted_ip_hash` **tidak dapat dibaca
+> manusia**. Perangkat desa yang ingin tahu "pengaduan ini datang dari mana"
+> tidak akan pernah mendapat jawabannya dari basis data — dan memang tidak
+> boleh, karena pertanyaan itu sendiri adalah bentuk pembukaan keanoniman.
+>
+> Sisi lain tautan itu ditutup di tempatnya sendiri:
+> `AuditLogger::logWithoutActor()` tidak mencatat `ip_address` sama sekali
+> (KEP-021).
 
 ### 3.6 Portal, Berkas, Audit, Pengaturan
 
