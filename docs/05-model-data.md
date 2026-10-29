@@ -336,7 +336,12 @@ CREATE TABLE residents (
     KEY idx_residents_region   (region_id, status, deleted_at),
     KEY idx_residents_family   (family_id, deleted_at),
     KEY idx_residents_birth    (birth_date),
-    KEY idx_residents_status   (status, deleted_at),
+    -- Indeks PENUTUP untuk halaman Laporan (KEP-019) — enam kolom terakhir
+    -- ada supaya rekap per wilayah & per kategori tidak perlu membuka indeks
+    -- berkluster sama sekali. Lihat catatan di bawah blok ini.
+    KEY idx_residents_status   (status, deleted_at, region_id, gender,
+                                religion_code, education_code,
+                                occupation_code, marital_status_code),
     FULLTEXT KEY ft_residents_name (full_name),
 
     -- RESTRICT (bukan SET NULL): MySQL melarang aksi referensial
@@ -354,6 +359,27 @@ CREATE TABLE residents (
     CONSTRAINT chk_residents_citizenship CHECK (citizenship IN ('WNI','WNA'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 ```
+
+> **Mengapa `idx_residents_status` selebar itu (KEP-019).** Halaman Laporan
+> menampilkan rekap penduduk per wilayah dan per lima kategori. Seluruhnya
+> menyaring `status = 'aktif' AND deleted_at IS NULL`, lalu membaca **satu
+> kolom lain** per baris. Dengan indeks yang hanya memuat dua kolom penyaring,
+> setiap rekap harus mengambil kolomnya dari indeks berkluster — 19.600
+> pencarian baris acak per rekap. Terukur pada 20.000 penduduk, yaitu volume
+> sasaran resmi proyek (NFR-PERF-07): `ReportService::population()` **755 ms
+> → 43 ms**, dan halaman `/laporan` 495 ms → 66 ms waktu basis data. Angka 755
+> ms itu melewati NFR-PERF-01 (p95 baca ≤ 500 ms) sendirian; halaman itu lolos
+> sampai Sprint 7 hanya karena basis data pengembangan berisi 500 penduduk,
+> bukan 20.000.
+>
+> Indeks penutup **terpisah** sudah dicoba lebih dulu dan ditolak karena
+> diukur: pengoptimasi MySQL tetap memilih `idx_residents_status` yang lebih
+> sempit, sehingga indeks baru hanya terpakai dengan `FORCE INDEX` — petunjuk
+> indeks di dalam Eloquent adalah janji yang patah tanpa suara pada versi MySQL
+> berikutnya. Dengan melebarkan indeks yang **sudah** dipilih, tidak ada
+> pilihan yang perlu dipaksakan. Harganya ± 110 byte per baris pada setiap
+> penulisan: yang ditukar adalah penulisan yang tidak ada yang menungguinya
+> dengan pembacaan yang ditunggui di depan layar.
 
 **Strategi pencarian nama (konsekuensi KEP-002):**
 ```sql
@@ -803,6 +829,7 @@ CREATE TABLE audit_logs (
     correlation_id CHAR(36) NULL,
     prev_hash      CHAR(64) NULL,
     row_hash       CHAR(64) NOT NULL,
+    hash_version   TINYINT UNSIGNED NOT NULL DEFAULT 1,  -- rumus hash, KEP-020
     created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY idx_audit_entity  (entity_type, entity_id, created_at),
     KEY idx_audit_actor   (actor_id, created_at),
@@ -828,6 +855,60 @@ FLUSH PRIVILEGES;
 >    bulanan yang memindahkan baris > 5 tahun ke `audit_logs_archive`.
 > 3. **Tanpa foreign key ke `users`.** Audit log harus tetap utuh walau akun pengguna
 >    dihapus — karena itu `actor_name` disalin, bukan di-*join*.
+> 4. **`hash_version` ada karena rumus hash pernah salah (KEP-020).** Rumus v1
+>    tidak pernah memasukkan kolom `changes` ke dalam rantai — nama `$this->changes`
+>    di dalam model mengenai properti `HasAttributes`, bukan kolomnya — sehingga
+>    nilai lama/baru data penduduk dapat diubah di luar aplikasi tanpa merusak
+>    rantai. Ia juga meng-*encode* kolom JSON menurut urutan kunci saat
+>    penulisan, padahal MySQL menyimpan JSON dalam bentuk binernya sendiri dan
+>    mengembalikan kuncinya **terurut** — sehingga verifikasi melaporkan rantai
+>    RUSAK atas baris yang jujur. Rumus v2 memperbaiki keduanya.
+>
+>    **Baris v1 tidak dapat dihitung ulang**, dan itu bukan kelonggaran
+>    melainkan satu-satunya pernyataan yang jujur: urutan kunci JSON aslinya
+>    sudah hilang saat MySQL menyimpannya. `sid:verify-audit-chain` karena itu
+>    memeriksa **sambungannya saja** pada baris v1 (`prev_hash` baris berikutnya
+>    sama dengan `row_hash` baris ini) dan melaporkan jumlahnya terpisah sebagai
+>    peringatan. Perubahan medan pada baris v1 memang tidak terdeteksi — sama
+>    seperti sebelum KEP-020 — dan itu dapat diterima HANYA karena sistem belum
+>    pernah berjalan di desa saat rumusnya diperbaiki.
+>
+>    **Bawaannya 1, bukan 2**, supaya baris lama menjadi v1 tanpa satu pun
+>    `UPDATE` — yang memang mustahil, karena hak akses MySQL di bawah ini
+>    mencabut UPDATE atas tabel ini — dan supaya penyisip massal yang tidak
+>    melewati `AuditLogger` melaporkan dirinya v1 secara jujur alih-alih
+>    mengaku v2.
+
+```sql
+-- Mutex rantai audit — KEP-020. SATU baris, tanpa kolom lain.
+CREATE TABLE audit_chain_lock (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO audit_chain_lock (id) VALUES (1) ON DUPLICATE KEY UPDATE id = id;
+```
+> **Tabel tanpa data, dan itu memang gunanya.** Perangkaian audit menuntut agar
+> tidak ada dua permintaan yang membaca ujung rantai yang sama — tanpa itu
+> keduanya memakai `prev_hash` yang sama dan rantainya bercabang. Penguncian
+> `ORDER BY id DESC LIMIT 1 FOR UPDATE` atas `audit_logs` melakukan itu, tetapi
+> ia mengambil *next-key lock* di ujung indeks; **gap lock InnoDB saling
+> kompatibel**, sehingga dua penyisipan audit bersamaan dapat saling menunggu
+> lewat *insert-intention lock* dan MySQL membunuh salah satunya (galat 1213).
+> Terukur pada uji beban Sprint 7: sekali per ± 44 menit, muncul sebagai HTTP
+> 500 di depan petugas.
+>
+> Baris ini dikunci **sebelum** ujung rantai dibaca. Karena penguncian dengan
+> kesetaraan kunci primer tidak mengambil gap lock, ia mengubah *deadlock*
+> menjadi antrean tunggu biasa: terukur 5 dari 6 gagal tanpanya, 6 dari 6
+> berhasil dengannya.
+>
+> Ia **sengaja tidak menyimpan hash ujung rantai**. Nilai itu akan menjadi
+> sumber kebenaran kedua yang basi setiap kali sesuatu menyisipkan baris tanpa
+> melewati `AuditLogger` — yang memang dilakukan penyemai volume. Ujung rantai
+> tetap dibaca dari `audit_logs`.
+>
+> Tabel ini **tidak** ikut dalam `REVOKE` di atas: aplikasi harus dapat
+> mengunci barisnya, dan tidak ada bukti apa pun yang tersimpan di dalamnya.
 
 ```sql
 CREATE TABLE settings (

@@ -875,8 +875,9 @@ selisih itu pada saat yang paling buruk — di rapat.
 2. **Impor massal menjadi sedikit lebih lambat.** Impor 20.000 baris
    memperbarui satu indeks yang lebih lebar. Pada penyemai volume, selisihnya
    tidak terukur di atas derau.
-3. **docs/05-model-data.md §3.2 masih menuliskan indeks yang lama.** Sampai
-   dokumen itu diselaraskan, entri ini adalah sumber kebenarannya.
+3. **docs/05-model-data.md §3.2 sudah diselaraskan** (2026-10-29): DDL-nya
+   menuliskan kedelapan kolom, beserta angka sebelum/sesudah dan alasan indeks
+   terpisah ditolak. Dokumen itu kembali menjadi sumber kebenaran skema.
 4. **Daftar putih kolom rekap kini dipakai di dua tempat** (satu kolom dan
    beberapa kolom). Nama kolom tidak dapat diikat sebagai parameter SQL, jadi
    daftar putih itu satu-satunya yang memisahkan laporan dari injeksi SQL;
