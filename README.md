@@ -1,10 +1,10 @@
 # Sistem Informasi Desa (SID)
 
-**Status:** Sprint 4 (Persuratan) **selesai** — lihat [laporan Sprint 4](docs/18-laporan-sprint-4.md).
+**Status:** Sprint 7 (Pengaduan, laporan, stabilisasi) **selesai** — milestone **M5 “Siap UAT”**. Lihat [laporan Sprint 7](docs/21-laporan-sprint-7.md); yang masih tersisa sebelum UAT ada di [§6–§7](docs/21-laporan-sprint-7.md) laporan itu.
 
 ```bash
 make setup && make serve     # http://localhost:8000 (termasuk npm ci && npm run build)
-make check                   # pint + phpstan + vue-tsc + 165 uji (sama dengan CI)
+make check                   # pint + phpstan + vue-tsc + 489 uji (sama dengan CI)
 ```
 
 Panduan pengembangan: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -56,6 +56,9 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | 16 | [Perbaikan Pasca-Sprint 2](docs/16-perbaikan-pasca-sprint-2.md) | Dev | 1.0 |
 | 17 | [Laporan Sprint 3](docs/17-laporan-sprint-3.md) | PM, Dev, Sponsor | 1.0 |
 | 18 | [Laporan Sprint 4](docs/18-laporan-sprint-4.md) | PM, Dev, Sponsor | 1.0 |
+| 21 | [Laporan Sprint 7](docs/21-laporan-sprint-7.md) | PM, Dev, Sponsor | 1.0 |
+| 22 | [Uji Penetrasi Sprint 7](docs/22-uji-penetrasi-sprint-7.md) | Security, Dev | 1.0 |
+| 23 | [Uji Beban, Volume & Tekanan Sprint 7](docs/23-uji-beban-sprint-7.md) | QA, DevOps, PM | 1.0 |
 
 ## Cara membaca
 - **Non-teknis (Kades, Sekdes, sponsor):** 00, 01, 02, 11, 13
@@ -69,7 +72,7 @@ Alasan, konsekuensi, dan hal yang dikorbankan dari setiap keputusan: **[00 Log K
 | Skala sasaran | ± 5.000 penduduk, 1.500 KK, ± 50 surat/hari |
 | Ukuran basis data (5 tahun) | < 1 GB — lihat [05 §8](docs/05-model-data.md) |
 | Modul MVP | Kependudukan · Persuratan · Portal publik · Pengaduan · RBAC · Laporan |
-| Sudah jadi | Fondasi (S1) · Kependudukan (S2) · Impor, mutasi, statistik, anomali (S3) |
+| Sudah jadi | Seluruh Fase 1 (S1–S7): fondasi · kependudukan · impor, mutasi, statistik, anomali · persuratan ujung-ke-ujung · portal & layanan warga (PWA) · pengaduan · dashboard, laporan & ekspor |
 | Estimasi MVP | 666 SP ≈ 340 hari-orang ≈ 17 minggu (tim 4 orang) |
 | Biaya operasional | ± Rp 400–600 rb/bulan |
 | Jenis surat siap pakai | 8 aktif + 14 tersedia ([13 §7](docs/13-katalog-surat.md)) |
